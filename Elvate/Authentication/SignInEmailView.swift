@@ -1,6 +1,6 @@
 //
 //  SignInEmailView.swift
-//  Elvate
+//  SignInEmailViewElvate
 //
 //  Created by Kamil Jakut on 01/11/2025.
 //

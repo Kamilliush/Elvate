@@ -11,6 +11,14 @@ import Combine
 @MainActor
 final class SettingsViewModel: ObservableObject {
     
+    @Published var authPrioviders: [AuthProviderOption] = []
+    
+    func loadAuthProviders() {
+        if let provider = try? AuthenticationManager.shared.getProviders() {
+            authPrioviders = provider
+        }
+    }
+    
     func logOut() throws {
         try AuthenticationManager.shared.signOut()
     }
@@ -70,24 +78,13 @@ struct SettingsView: View {
                     }
                 }
             }
-            Button("Set reset Password link") {
-                Task {
-                    do {
-                        try await viewModel.resetPassword()
-                        print("Password reset!")
-                    } catch {
-                        print(error)
-                    }
-                }
-            }
             
-            Button("Update Password") {
-                showUpdatePasswordPopup = true
+            if viewModel.authPrioviders.contains(.email) {
+                emailSection
             }
-            
-            Button("Update email") {
-                showUpdateEmailPopup = true
-            }
+        }
+        .onAppear {
+            viewModel.loadAuthProviders()
         }
         .navigationBarTitle("Settings")
         .alert("Zmień e-mail", isPresented: $showUpdateEmailPopup) {
@@ -136,5 +133,33 @@ struct SettingsView: View {
 #Preview {
     NavigationStack{
         SettingsView(showSignInView: .constant(false))
+    }
+}
+
+extension SettingsView {
+    private var emailSection: some View {
+        Section {
+            Button("Set reset Password link") {
+                Task {
+                    do {
+                        try await viewModel.resetPassword()
+                        print("Password reset!")
+                    } catch {
+                        print(error)
+                    }
+                }
+            }
+            
+            Button("Update Password") {
+                showUpdatePasswordPopup = true
+            }
+            
+            Button("Update email") {
+                showUpdateEmailPopup = true
+            }
+        } header: {
+            Text("Email Functions")
+        }
+
     }
 }
