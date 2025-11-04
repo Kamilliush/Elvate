@@ -11,6 +11,7 @@
 		BA420B3D2EB619D900B7596C /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = BA420B3C2EB619D900B7596C /* FirebaseAuth */; };
 		BA79D6A52EB6B84A004A062F /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = BA79D6A42EB6B84A004A062F /* GoogleSignIn */; };
 		BA79D6A72EB6B84A004A062F /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = BA79D6A62EB6B84A004A062F /* GoogleSignInSwift */; };
+		BADAAE8A2EBA2079005A5C12 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = BADAAE892EBA2079005A5C12 /* FirebaseFirestore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -46,6 +47,7 @@
 				BA420B3A2EB611B800B7596C /* FirebaseAnalytics in Frameworks */,
 				BA420B3D2EB619D900B7596C /* FirebaseAuth in Frameworks */,
 				BA79D6A52EB6B84A004A062F /* GoogleSignIn in Frameworks */,
+				BADAAE8A2EBA2079005A5C12 /* FirebaseFirestore in Frameworks */,
 				BA79D6A72EB6B84A004A062F /* GoogleSignInSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -101,6 +103,7 @@
 				BA420B3C2EB619D900B7596C /* FirebaseAuth */,
 				BA79D6A42EB6B84A004A062F /* GoogleSignIn */,
 				BA79D6A62EB6B84A004A062F /* GoogleSignInSwift */,
+				BADAAE892EBA2079005A5C12 /* FirebaseFirestore */,
 			);
 			productName = Elvate;
 			productReference = BA420B1A2EB6097E00B7596C /* Elvate.app */;
@@ -414,6 +417,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = BA79D6A32EB6B84A004A062F /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
 			productName = GoogleSignInSwift;
+		};
+		BADAAE892EBA2079005A5C12 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BA420B382EB611B800B7596C /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

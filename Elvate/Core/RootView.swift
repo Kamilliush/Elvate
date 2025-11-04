@@ -9,23 +9,23 @@ import SwiftUI
 
 struct RootView: View {
     
-    @State private var showSingInView: Bool = false
+    @State private var showSignInView: Bool = false
     
     var body: some View {
         ZStack {
-            if !showSingInView {
+            if !showSignInView {
                 NavigationStack {
-                    SettingsView(showSignInView: $showSingInView)
+                    ProfileView(showSignInView: $showSignInView)
                 }
             }
         }
         .onAppear {
             let authUser = try? AuthenticationManager.shared.getAuthenticatedUser()
-            self.showSingInView = authUser == nil
+            self.showSignInView = authUser == nil
         }
-        .fullScreenCover(isPresented: $showSingInView) {
+        .fullScreenCover(isPresented: $showSignInView) {
             NavigationStack {
-                AuthenticationView(showSingInView: $showSingInView)
+                AuthenticationView(showSingInView: $showSignInView)
             }
         }
     }
