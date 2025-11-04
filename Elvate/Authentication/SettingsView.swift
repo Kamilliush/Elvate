@@ -23,6 +23,17 @@ final class SettingsViewModel: ObservableObject {
         try AuthenticationManager.shared.signOut()
     }
     
+    func deleteAccount(currentPassword: String) async throws {
+        let user = try AuthenticationManager.shared.getAuthenticatedUser()
+        guard let email = user.email else {
+            throw URLError(.badServerResponse)
+        }
+        // reauthenticate with current password
+        try await AuthenticationManager.shared.reauthenticateUser(email: email, password: currentPassword)
+        // delete after successful reauth
+        try await AuthenticationManager.shared.delete()
+    }
+    
     func resetPassword() async throws {
         let authUser = try AuthenticationManager.shared.getAuthenticatedUser()
         
@@ -49,6 +60,7 @@ final class SettingsViewModel: ObservableObject {
         try await AuthenticationManager.shared.updatePassword(password: newPassword)
     }
     
+    
 }
 struct SettingsView: View {
     
@@ -56,6 +68,7 @@ struct SettingsView: View {
     @Binding var showSignInView: Bool
     
     // popupy
+    @State private var showDeleteAccountPopup = false
     @State private var showUpdateEmailPopup = false
     @State private var showUpdatePasswordPopup = false
     
@@ -79,6 +92,12 @@ struct SettingsView: View {
                 }
             }
             
+            Button(role: .destructive) {
+                showDeleteAccountPopup = true
+            } label: {
+                Text("Delete Account")
+            }
+            
             if viewModel.authPrioviders.contains(.email) {
                 emailSection
             }
@@ -87,6 +106,31 @@ struct SettingsView: View {
             viewModel.loadAuthProviders()
         }
         .navigationBarTitle("Settings")
+        
+        .alert("Delete Account", isPresented: $showDeleteAccountPopup) {
+            SecureField("Aktualne hasło", text: $currentPassword)
+            
+            Button("Anuluj", role: .cancel) {
+                currentPassword = ""
+            }
+            Button("Zapisz") {
+                Task {
+                    do {
+                        try await viewModel.deleteAccount(currentPassword: currentPassword)
+                        print("Konto usunięte")
+                        // Wyczyść stan i pokaż ekran logowania
+                        currentPassword = ""
+                        showDeleteAccountPopup = false
+                        showSignInView = true
+                    } catch {
+                        // Błąd np. zły password: Firebase zwykle zwraca error code .wrongPassword / .requiresRecentLogin
+                        print("⚠️ Błąd podczas usuwania konta: \(error.localizedDescription)")
+                    }
+                }
+            }
+        } message: {
+            Text("Aby usunąć konto, wprowadź aktualne hasło.")
+        }
         .alert("Zmień e-mail", isPresented: $showUpdateEmailPopup) {
             TextField("Nowy e-mail", text: $newEmail)
             SecureField("Aktualne hasło", text: $currentPassword)
