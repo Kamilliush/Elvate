@@ -59,6 +59,20 @@ struct ProfileView: View {
     }
     var body: some View {
         List {
+            // Navigation to MeasurementsView
+            Section {
+                NavigationLink {
+                    MeasurementsView()
+                } label: {
+                    HStack {
+                        Image(systemName: "ruler")
+                            .foregroundStyle(.blue)
+                        Text("Measurements")
+                            .font(.headline)
+                    }
+                }
+            }
+            
             if let user = viewModel.user {
                 Text("userId: \(user.userId)")
                 
