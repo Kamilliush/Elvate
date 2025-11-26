@@ -17,7 +17,7 @@ struct WorkoutView: View {
     var body: some View {
         NavigationStack(path: $path) {
             VStack(spacing: 24) {
-                Text("Twój trening")
+                Text("Workouts")
                     .font(.largeTitle.bold())
                 
                 NavigationLink {
@@ -25,7 +25,7 @@ struct WorkoutView: View {
                         path.append(NavDestination.personalize(selected))
                     }
                 } label: {
-                    Text("New Routine")
+                    Text("New routine")
                         .font(.headline)
                         .padding()
                         .frame(maxWidth: .infinity)
@@ -35,29 +35,29 @@ struct WorkoutView: View {
                 }
                 
                 if isLoading {
-                    ProgressView("Ładowanie zapisanych rutyn…")
+                    ProgressView("Loading saved routines")
                         .frame(maxWidth: .infinity, alignment: .center)
                 } else if let errorMessage {
                     VStack(spacing: 8) {
-                        Text("Błąd: \(errorMessage)")
+                        Text("Error: \(errorMessage)")
                             .foregroundStyle(.red)
-                        Button("Spróbuj ponownie") {
+                        Button("Try again") {
                             Task { await loadRemoteRoutines() }
                         }
                     }
                     .frame(maxWidth: .infinity)
                 } else if routineStore.routines.isEmpty {
                     VStack(spacing: 8) {
-                        Text("Brak zapisanych rutyn")
+                        Text("Currently you don't have any saved routines")
                             .foregroundStyle(.secondary)
-                        Text("Utwórz pierwszą, klikając „New Routine”.")
+                        Text("Create your first routine by clicking the 'New Routine' button")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity)
                 } else {
                     List {
-                        Section(header: Text("Zapisane rutyny")) {
+                        Section(header: Text("Saved routines")) {
                             ForEach(routineStore.routines) { routine in
                                 NavigationLink {
                                     RoutineDetailView(routine: routine)
@@ -69,7 +69,7 @@ struct WorkoutView: View {
                                                     .font(.headline)
                                                 
                                                 if isInProgress(routineName: routine.name) {
-                                                    Text("W trakcie")
+                                                    Text("In progress")
                                                         .font(.caption2.weight(.semibold))
                                                         .padding(.horizontal, 6)
                                                         .padding(.vertical, 2)
@@ -79,7 +79,7 @@ struct WorkoutView: View {
                                                 }
                                             }
                                             
-                                            Text("\(routine.items.count) ćwicz.")
+                                            Text("\(routine.items.count) exercises.")
                                                 .font(.subheadline)
                                                 .foregroundStyle(.secondary)
                                         }
@@ -94,7 +94,7 @@ struct WorkoutView: View {
                 Spacer()
             }
             .padding()
-            .navigationTitle("Workout")
+            .navigationTitle("Workouts")
             .navigationDestination(for: NavDestination.self) { destination in
                 switch destination {
                 case .personalize(let exercises):
@@ -129,7 +129,7 @@ struct WorkoutView: View {
         defer { isLoading = false }
         
         guard let auth = try? AuthenticationManager.shared.getAuthenticatedUser() else {
-            errorMessage = "Brak zalogowanego użytkownika."
+            errorMessage = "User no logged in"
             return
         }
         

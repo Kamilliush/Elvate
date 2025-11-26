@@ -57,11 +57,11 @@ struct ExercisesView: View {
     var body: some View {
         Group {
             if viewModel.isLoading {
-                ProgressView("Ładowanie…")
+                ProgressView("Loading…")
             } else if let error = viewModel.errorMessage {
                 VStack(spacing: 12) {
                     Text(error)
-                    Button("Spróbuj ponownie") {
+                    Button("Try again") {
                         Task { await viewModel.loadExercises() }
                     }
                 }
@@ -78,17 +78,14 @@ struct ExercisesView: View {
                             
                             // pokaż primary muscles skrótowo
                             if !exercise.primaryMuscles.isEmpty {
-                                Text("Primary: \(exercise.primaryMuscles.joined(separator: ", "))")
+                                Text("Primary muscle: \(exercise.primaryMuscles.joined(separator: ", "))")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                                     .lineLimit(1)
                             }
                         }
-                        Spacer()
-                        if selectionMode {
-                            Image(systemName: selectedIds.contains(exercise.id) ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(selectedIds.contains(exercise.id) ? .blue : .secondary)
-                        }
+                        
+                       
                     }
                     .contentShape(Rectangle())
                     .onTapGesture {
@@ -109,7 +106,7 @@ struct ExercisesView: View {
                                 let selected = viewModel.exercises.filter { selectedIds.contains($0.id) }
                                 onContinue?(selected)
                             } label: {
-                                Text("Dalej (\(selectedIds.count))")
+                                Text("Next (\(selectedIds.count))")
                                     .font(.headline)
                             }
                             .disabled(selectedIds.isEmpty)
@@ -120,14 +117,14 @@ struct ExercisesView: View {
                         Menu {
                             // Szybkie akcje
                             if !selectedPrimaryMuscles.isEmpty {
-                                Button("Wyczyść filtry") {
+                                Button("Clear filters") {
                                     selectedPrimaryMuscles.removeAll()
                                 }
                             }
                             // Lista mięśni do wyboru
                             Section(header: Text("Primary muscles")) {
                                 if allPrimaryMuscles.isEmpty {
-                                    Text("Brak danych o mięśniach")
+                                    Text("No muscle data available")
                                 } else {
                                     ForEach(allPrimaryMuscles, id: \.self) { muscle in
                                         let isOn = selectedPrimaryMuscles.contains(muscle)
@@ -148,7 +145,7 @@ struct ExercisesView: View {
                             }
                         } label: {
                             if selectedPrimaryMuscles.isEmpty {
-                                Label("Filtruj", systemImage: "line.3.horizontal.decrease.circle")
+                                Label("Filter", systemImage: "line.3.horizontal.decrease.circle")
                             } else {
                                 Label("\(selectedPrimaryMuscles.count)", systemImage: "line.3.horizontal.decrease.circle.fill")
                             }
@@ -156,10 +153,10 @@ struct ExercisesView: View {
                     }
                 }
                 // Pasek wyszukiwania po nazwie
-                .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .automatic), prompt: "Szukaj ćwiczenia")
+                .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .automatic), prompt: "Search exercise")
             }
         }
-        .navigationTitle("Ćwiczenia")
+        .navigationTitle("Exercises")
         .task {
             await viewModel.loadExercises()
         }
