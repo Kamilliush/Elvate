@@ -7,15 +7,53 @@
 
 import SwiftUI
 import Combine
+import Charts
 
 @MainActor
 final class ProfileViewModel: ObservableObject {
     
     @Published private(set) var user: DBUser? = nil
+    @Published var completed: [DBCompletedWorkout] = []
+    
+    // Historia wagi do wykresu
+    @Published var weightHistory: [DBMetricEntry] = []
+    @Published var isLoadingWeight: Bool = false
+    @Published var weightError: String? = nil
     
     func loadCurrentUser() async throws {
         let authDataResult = try AuthenticationManager.shared.getAuthenticatedUser()
         self.user = try await UserManager.shared.getUser(userId: authDataResult.uid)
+    }
+    
+    func loadCompletedWorkouts() async {
+        guard let auth = try? AuthenticationManager.shared.getAuthenticatedUser() else { return }
+        do {
+            let items = try await CompletedWorkoutsManager.shared.fetchCompleted(userId: auth.uid)
+            self.completed = items
+        } catch {
+            print("Fetch completed workouts failed:", error)
+        }
+    }
+    
+    func loadWeightHistory() async {
+        weightError = nil
+        isLoadingWeight = true
+        defer { isLoadingWeight = false }
+        
+        guard let auth = try? AuthenticationManager.shared.getAuthenticatedUser() else {
+            weightError = "Brak zalogowanego użytkownika."
+            return
+        }
+        do {
+            // pobierz całą historię wagi (lub limit, jeśli chcesz)
+            let items = try await MeasurementsManager.shared.fetchMetricEntries(
+                userId: auth.uid,
+                metricId: MeasurementMetric.weight.metricId
+            )
+            self.weightHistory = items
+        } catch {
+            weightError = "Nie udało się pobrać historii wagi: \(error.localizedDescription)"
+        }
     }
     
     func togglePremiumStatus() async throws {
@@ -73,6 +111,40 @@ struct ProfileView: View {
                 }
             }
             
+            // Wykres historii wagi
+            Section(header: Text("Waga – historia")) {
+                if viewModel.isLoadingWeight {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, alignment: .center)
+                } else if let err = viewModel.weightError {
+                    VStack(spacing: 8) {
+                        Text(err)
+                            .foregroundStyle(.red)
+                        Button("Spróbuj ponownie") {
+                            Task { await viewModel.loadWeightHistory() }
+                        }
+                    }
+                } else if viewModel.weightHistory.isEmpty {
+                    Text("Brak danych o wadze")
+                        .foregroundStyle(.secondary)
+                } else {
+                    Chart {
+                        ForEach(viewModel.weightHistory, id: \.id) { e in
+                            LineMark(
+                                x: .value("Data", e.dateCreated),
+                                y: .value("Waga (kg)", e.value)
+                            )
+                            PointMark(
+                                x: .value("Data", e.dateCreated),
+                                y: .value("Waga (kg)", e.value)
+                            )
+                        }
+                    }
+                    .frame(height: 220)
+                  
+                }
+            }
+            
             if let user = viewModel.user {
                 Text("userId: \(user.userId)")
                 
@@ -103,20 +175,53 @@ struct ProfileView: View {
                             .buttonStyle(.borderedProminent)
                             .tint(preferenceIsSelected(text: string) == true ? .green: .red)
                         }
-                        
-                        
                     }
                     
                     Text("user preferences: \((user.preferences ?? []).joined(separator: ", "))")
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
+            
+            // Zakończone treningi
+            Section(header: Text("Zakończone treningi")) {
+                if viewModel.completed.isEmpty {
+                    Text("Brak zakończonych treningów")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(viewModel.completed, id: \.id) { w in
+                        NavigationLink {
+                            CompletedWorkoutDetailView(workout: w)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(w.routineName)
+                                    .font(.headline)
+                                HStack {
+                                    Text(w.dateCompleted.formatted(date: .abbreviated, time: .shortened))
+                                    Spacer()
+                                    Text(timeString(w.durationSeconds))
+                                        .monospacedDigit()
+                                        .foregroundStyle(.secondary)
+                                }
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
         }
         .task {
             try? await viewModel.loadCurrentUser()
+            await viewModel.loadCompletedWorkouts()
+            await viewModel.loadWeightHistory()
         }
         .navigationTitle("Profile")
-       
+    }
+    
+    private func timeString(_ seconds: Int) -> String {
+        let m = seconds / 60
+        let s = seconds % 60
+        return String(format: "%02d:%02d", m, s)
     }
 }
 

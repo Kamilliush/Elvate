@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct Exercise: Identifiable, Decodable {
+struct Exercise: Identifiable, Decodable, Hashable {
     let id: String
     let name: String
     let force: String?
