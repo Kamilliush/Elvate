@@ -116,16 +116,7 @@ struct ProfileView: View {
             try? await viewModel.loadCurrentUser()
         }
         .navigationTitle("Profile")
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                NavigationLink{
-                    SettingsView(showSignInView: $showSignInView)
-                } label: {
-                    Image(systemName: "gear")
-                        .font(.headline)
-                }
-            }
-        }
+       
     }
 }
 
