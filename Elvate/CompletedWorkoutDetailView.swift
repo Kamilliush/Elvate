@@ -3,6 +3,11 @@ import SwiftUI
 struct CompletedWorkoutDetailView: View {
     let workout: DBCompletedWorkout
     
+    @Environment(\.dismiss) private var dismiss
+    @State private var showDeleteAlert: Bool = false
+    @State private var isDeleting: Bool = false
+    @State private var errorMessage: String? = nil
+    
     var body: some View {
         List {
             Section(header: Text("Trening")) {
@@ -14,6 +19,13 @@ struct CompletedWorkoutDetailView: View {
                     Text(timeString(workout.durationSeconds))
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
+                }
+            }
+            
+            if let errorMessage {
+                Section {
+                    Text(errorMessage)
+                        .foregroundStyle(.red)
                 }
             }
             
@@ -33,12 +45,54 @@ struct CompletedWorkoutDetailView: View {
                             Image(systemName: s.done ? "checkmark.circle.fill" : "xmark.circle.fill")
                                 .foregroundStyle(s.done ? .green : .red)
                         }
-
                     }
                 }
             }
         }
         .navigationTitle(workout.routineName)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(role: .destructive) {
+                    showDeleteAlert = true
+                } label: {
+                    Label("Usuń", systemImage: "trash")
+                }
+                .disabled(isDeleting || workout.id == nil)
+            }
+        }
+        .alert("Usunąć ten zakończony trening?", isPresented: $showDeleteAlert) {
+            Button("Anuluj", role: .cancel) {}
+            Button("Usuń", role: .destructive) {
+                Task { await deleteWorkout() }
+            }
+        } message: {
+            Text("Tej operacji nie można cofnąć.")
+        }
+    }
+    
+    private func deleteWorkout() async {
+        errorMessage = nil
+        guard let docId = workout.id else {
+            errorMessage = "Brak identyfikatora dokumentu."
+            return
+        }
+        guard let auth = try? AuthenticationManager.shared.getAuthenticatedUser() else {
+            errorMessage = "Brak zalogowanego użytkownika."
+            return
+        }
+        isDeleting = true
+        defer { isDeleting = false }
+        
+        do {
+            try await CompletedWorkoutsManager.shared.deleteCompletedWorkout(userId: auth.uid, documentId: docId)
+            await MainActor.run {
+                dismiss()
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = "Nie udało się usunąć: \(error.localizedDescription)"
+            }
+        }
     }
     
     private func timeString(_ seconds: Int) -> String {

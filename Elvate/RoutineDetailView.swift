@@ -11,6 +11,16 @@ struct RoutineDetailView: View {
     @State private var workoutTimerTask: Task<Void, Never>? = nil
     @State private var errorMessage: String? = nil
     @State private var saveSuccess: Bool = false
+    @Environment(\.dismiss) private var dismiss
+    
+    // Heart rate pominęliśmy – zostaje na przyszłość
+    
+    // Sheet podsumowania
+    @State private var showSummary: Bool = false
+    @State private var summary: WorkoutSummary? = nil
+    
+    // Wznawianie
+    @State private var askResume: Bool = false
     
     var body: some View {
         List {
@@ -118,12 +128,6 @@ struct RoutineDetailView: View {
                         .foregroundStyle(.red)
                 }
             }
-            if saveSuccess {
-                Section {
-                    Label("Zapisano zakończony trening", systemImage: "checkmark.circle")
-                        .foregroundStyle(.green)
-                }
-            }
         }
         .id(isRunning)
         .navigationTitle(routine.name)
@@ -131,9 +135,33 @@ struct RoutineDetailView: View {
             if states.isEmpty {
                 states = routine.items.map { RuntimeExerciseState(item: $0) }
             }
+            // sprawdź, czy jest trening w toku dla tej rutyny
+            if let inProgress = WorkoutInProgressStore.shared.load(routineName: routine.name) {
+                // podpowiedz wznowienie
+                askResume = true
+            }
         }
         .onDisappear {
             stopWorkoutTimer()
+        }
+        .alert("Wznowić niedokończony trening?", isPresented: $askResume) {
+            Button("Nie", role: .cancel) {
+                // nic – zostaw podgląd
+            }
+            Button("Wznów") {
+                resumeIfAvailable()
+            }
+        } message: {
+            Text("Znaleziono zapisany stan treningu dla tej rutyny.")
+        }
+        .sheet(isPresented: $showSummary) {
+            if let summary {
+                WorkoutSummaryView(summary: summary) {
+                    // zamknij sheet i wróć do listy
+                    showSummary = false
+                    dismiss()
+                }
+            }
         }
     }
     
@@ -190,8 +218,11 @@ struct RoutineDetailView: View {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
                 workoutElapsedSeconds += 1
+                saveInProgressSnapshot()
             }
         }
+        // pierwszy snapshot od razu
+        saveInProgressSnapshot()
     }
     
     private func stopWorkoutTimer() {
@@ -199,7 +230,7 @@ struct RoutineDetailView: View {
         workoutTimerTask = nil
     }
     
-    // MARK: - Save completed workout
+    // MARK: - Save completed workout and show summary
     
     private func endAndSaveWorkout() async {
         stopWorkoutTimer()
@@ -225,7 +256,7 @@ struct RoutineDetailView: View {
         }
         
         let completed = DBCompletedWorkout(
-            routineId: nil, // jeśli będziesz miał id z DBRoutine, możesz je tu podać
+            routineId: nil,
             routineName: routine.name,
             dateCompleted: Date(),
             durationSeconds: workoutElapsedSeconds,
@@ -235,8 +266,84 @@ struct RoutineDetailView: View {
         do {
             try await CompletedWorkoutsManager.shared.addCompletedWorkout(userId: auth.uid, workout: completed)
             saveSuccess = true
+            // usuń stan in-progress
+            WorkoutInProgressStore.shared.clear(routineName: routine.name)
+            // policz podsumowanie i pokaż sheet
+            let runtimeSnapshots = states.map { st in
+                RuntimeExerciseSnapshot(
+                    exerciseId: st.item.exercise.id,
+                    exerciseName: st.item.exercise.name,
+                    restSeconds: st.item.restSeconds,
+                    sets: st.setsProgress.map {
+                        RuntimeSetSnapshot(index: $0.index, repsDone: $0.repsDone, weight: $0.weight, done: $0.done)
+                    }
+                )
+            }
+            summary = WorkoutSummary.from(
+                routineName: routine.name,
+                durationSeconds: workoutElapsedSeconds,
+                states: runtimeSnapshots
+            )
+            showSummary = true
         } catch {
             errorMessage = "Nie udało się zapisać zakończonego treningu: \(error.localizedDescription)"
+        }
+    }
+    
+    // MARK: - In-progress snapshot
+    
+    private func saveInProgressSnapshot() {
+        guard isRunning else { return }
+        let snapshots: [RuntimeExerciseSnapshot] = states.map { st in
+            RuntimeExerciseSnapshot(
+                exerciseId: st.item.exercise.id,
+                exerciseName: st.item.exercise.name,
+                restSeconds: st.item.restSeconds,
+                sets: st.setsProgress.map {
+                    RuntimeSetSnapshot(index: $0.index, repsDone: $0.repsDone, weight: $0.weight, done: $0.done)
+                }
+            )
+        }
+        let data = WorkoutInProgress(
+            routineName: routine.name,
+            startedAt: Date(),
+            elapsedSeconds: workoutElapsedSeconds,
+            exercises: snapshots
+        )
+        WorkoutInProgressStore.shared.save(routineName: routine.name, data: data)
+    }
+    
+    private func resumeIfAvailable() {
+        guard let saved = WorkoutInProgressStore.shared.load(routineName: routine.name) else { return }
+        // odtwórz stany
+        if states.isEmpty {
+            states = routine.items.map { RuntimeExerciseState(item: $0) }
+        }
+        // mapuj z saved.exercises do states
+        for i in states.indices {
+            let exId = states[i].item.exercise.id
+            if let snap = saved.exercises.first(where: { $0.exerciseId == exId }) {
+                // zaktualizuj sety
+                for j in states[i].setsProgress.indices {
+                    let idx = states[i].setsProgress[j].index
+                    if let s = snap.sets.first(where: { $0.index == idx }) {
+                        states[i].setsProgress[j].repsDone = s.repsDone
+                        states[i].setsProgress[j].weight = s.weight
+                        states[i].setsProgress[j].done = s.done
+                    }
+                }
+            }
+        }
+        workoutElapsedSeconds = saved.elapsedSeconds
+        isRunning = true
+        // uruchom timer
+        stopWorkoutTimer()
+        workoutTimerTask = Task { @MainActor in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                workoutElapsedSeconds += 1
+                saveInProgressSnapshot()
+            }
         }
     }
     
@@ -260,6 +367,7 @@ struct RoutineDetailView: View {
             startRest(for: stateId)
         }
         states[idx].recalculateCompletion()
+        saveInProgressSnapshot()
     }
     
     private func markNextSetDone(for stateId: UUID) {
@@ -269,6 +377,7 @@ struct RoutineDetailView: View {
         states[idx].setsProgress[next].done = true
         startRest(for: stateId)
         states[idx].recalculateCompletion()
+        saveInProgressSnapshot()
     }
     
     private func finishExercise(for stateId: UUID) {
@@ -279,6 +388,7 @@ struct RoutineDetailView: View {
         }
         stopRest(for: stateId)
         states[idx].recalculateCompletion()
+        saveInProgressSnapshot()
     }
 }
 

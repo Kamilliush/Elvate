@@ -62,12 +62,28 @@ struct WorkoutView: View {
                                 NavigationLink {
                                     RoutineDetailView(routine: routine)
                                 } label: {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(routine.name)
-                                            .font(.headline)
-                                        Text("\(routine.items.count) ćwicz.")
-                                            .font(.subheadline)
-                                            .foregroundStyle(.secondary)
+                                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            HStack(spacing: 8) {
+                                                Text(routine.name)
+                                                    .font(.headline)
+                                                
+                                                if isInProgress(routineName: routine.name) {
+                                                    Text("W trakcie")
+                                                        .font(.caption2.weight(.semibold))
+                                                        .padding(.horizontal, 6)
+                                                        .padding(.vertical, 2)
+                                                        .background(Color.orange.opacity(0.15))
+                                                        .foregroundColor(.orange)
+                                                        .clipShape(Capsule())
+                                                }
+                                            }
+                                            
+                                            Text("\(routine.items.count) ćwicz.")
+                                                .font(.subheadline)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        Spacer()
                                     }
                                 }
                             }
@@ -92,7 +108,17 @@ struct WorkoutView: View {
             .refreshable {
                 await loadRemoteRoutines()
             }
+            .onAppear {
+                // odświeżenie listy, aby badge “W trakcie” był aktualny po powrocie
+                // (UserDefaults nie potrzebuje asynchronicznego ładowania)
+            }
         }
+    }
+    
+    // MARK: - In-progress flag
+    
+    private func isInProgress(routineName: String) -> Bool {
+        WorkoutInProgressStore.shared.load(routineName: routineName) != nil
     }
     
     // MARK: - Remote load

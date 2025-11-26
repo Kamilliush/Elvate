@@ -29,9 +29,9 @@ final class CompletedWorkoutsManager {
     static let shared = CompletedWorkoutsManager()
     private init() {}
     
-    private let users = Firestore.firestore().collection("users")
+    fileprivate let users = Firestore.firestore().collection("users")
     
-    private func completedCollection(userId: String) -> CollectionReference {
+    fileprivate func completedCollection(userId: String) -> CollectionReference {
         users.document(userId).collection("completedWorkouts")
     }
     
@@ -45,5 +45,12 @@ final class CompletedWorkoutsManager {
         if let limit { query = query.limit(to: limit) }
         let snap = try await query.getDocuments()
         return try snap.documents.map { try $0.data(as: DBCompletedWorkout.self) }
+    }
+    
+    // NOWE: usuwanie zakończonego treningu
+    func deleteCompletedWorkout(userId: String, documentId: String) async throws {
+        try await completedCollection(userId: userId)
+            .document(documentId)
+            .delete()
     }
 }
