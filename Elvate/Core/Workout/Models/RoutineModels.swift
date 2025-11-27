@@ -16,7 +16,9 @@ struct ExerciseInRoutine: Identifiable, Hashable {
 
 struct Routine: Identifiable, Hashable {
     let id: UUID = UUID()
+    var dbId: String?                 // Firestore document id
     var name: String
     var items: [ExerciseInRoutine]
     var dateCreated: Date = Date()
 }
+

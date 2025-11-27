@@ -18,7 +18,7 @@ struct MeasurementDetailView: View {
     var body: some View {
         VStack(spacing: 16) {
             Form {
-                Section(header: Text("Edytuj")) {
+                Section(header: Text("Edit")) {
                     HStack {
                         TextField("\(viewModel.metric.title)", text: $viewModel.inputText)
                             .keyboardType(.decimalPad)
@@ -32,7 +32,7 @@ struct MeasurementDetailView: View {
                         if viewModel.isSaving {
                             ProgressView()
                         } else {
-                            Text("Zapisz")
+                            Text("Save")
                                 .font(.headline)
                         }
                     }
@@ -46,18 +46,18 @@ struct MeasurementDetailView: View {
                     }
                 }
                 
-                Section(header: Text("Historia")) {
+                Section(header: Text("History")) {
                     if viewModel.isLoading {
                         ProgressView()
                     } else {
                         Chart {
                             ForEach(viewModel.history, id: \.id) { e in
                                 LineMark(
-                                    x: .value("Data", e.dateCreated),
+                                    x: .value("Date", e.dateCreated),
                                     y: .value(viewModel.metric.title, e.value)
                                 )
                                 PointMark(
-                                    x: .value("Data", e.dateCreated),
+                                    x: .value("Date", e.dateCreated),
                                     y: .value(viewModel.metric.title, e.value)
                                 )
                             }

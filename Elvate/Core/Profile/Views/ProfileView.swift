@@ -112,7 +112,7 @@ struct ProfileView: View {
             }
             
             // Wykres historii wagi
-            Section(header: Text("Waga – historia")) {
+            Section(header: Text("Weight")) {
                 if viewModel.isLoadingWeight {
                     ProgressView()
                         .frame(maxWidth: .infinity, alignment: .center)
@@ -120,23 +120,23 @@ struct ProfileView: View {
                     VStack(spacing: 8) {
                         Text(err)
                             .foregroundStyle(.red)
-                        Button("Spróbuj ponownie") {
+                        Button("Try again") {
                             Task { await viewModel.loadWeightHistory() }
                         }
                     }
                 } else if viewModel.weightHistory.isEmpty {
-                    Text("Brak danych o wadze")
+                    Text("No weight data")
                         .foregroundStyle(.secondary)
                 } else {
                     Chart {
                         ForEach(viewModel.weightHistory, id: \.id) { e in
                             LineMark(
-                                x: .value("Data", e.dateCreated),
-                                y: .value("Waga (kg)", e.value)
+                                x: .value("Date", e.dateCreated),
+                                y: .value("Weight (kg)", e.value)
                             )
                             PointMark(
-                                x: .value("Data", e.dateCreated),
-                                y: .value("Waga (kg)", e.value)
+                                x: .value("Date", e.dateCreated),
+                                y: .value("Weight (kg)", e.value)
                             )
                         }
                     }
@@ -145,47 +145,47 @@ struct ProfileView: View {
                 }
             }
             
-            if let user = viewModel.user {
-                Text("userId: \(user.userId)")
-                
-                Button {
-                    Task {
-                        do {
-                            try await viewModel.togglePremiumStatus()
-                        } catch {
-                            print("Toggle premium failed: \(error)")
-                        }
-                    }
-                } label: {
-                    Text ("User is premium: \((user.isPremium ?? false).description.capitalized)")
-                }
-                
-                VStack{
-                    
-                    HStack {
-                        ForEach(preferenceOptions, id: \.self) { string in
-                            Button(string) {
-                                if preferenceIsSelected(text: string) {
-                                    viewModel.removeUserPreference(text: string)
-                                } else {
-                                    viewModel.addUserPreference(text: string)
-                                }
-                            }
-                            .font(.headline)
-                            .buttonStyle(.borderedProminent)
-                            .tint(preferenceIsSelected(text: string) == true ? .green: .red)
-                        }
-                    }
-                    
-                    Text("user preferences: \((user.preferences ?? []).joined(separator: ", "))")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
+//            if let user = viewModel.user {
+//                Text("userId: \(user.userId)")
+//                
+//                Button {
+//                    Task {
+//                        do {
+//                            try await viewModel.togglePremiumStatus()
+//                        } catch {
+//                            print("Toggle premium failed: \(error)")
+//                        }
+//                    }
+//                } label: {
+//                    Text ("User is premium: \((user.isPremium ?? false).description.capitalized)")
+//                }
+//                
+//                VStack{
+//                    
+//                    HStack {
+//                        ForEach(preferenceOptions, id: \.self) { string in
+//                            Button(string) {
+//                                if preferenceIsSelected(text: string) {
+//                                    viewModel.removeUserPreference(text: string)
+//                                } else {
+//                                    viewModel.addUserPreference(text: string)
+//                                }
+//                            }
+//                            .font(.headline)
+//                            .buttonStyle(.borderedProminent)
+//                            .tint(preferenceIsSelected(text: string) == true ? .green: .red)
+//                        }
+//                    }
+//                    
+//                    Text("user preferences: \((user.preferences ?? []).joined(separator: ", "))")
+//                        .frame(maxWidth: .infinity, alignment: .leading)
+//                }
+//            }
             
             // Zakończone treningi
-            Section(header: Text("Zakończone treningi")) {
+            Section(header: Text("Finished trainings")) {
                 if viewModel.completed.isEmpty {
-                    Text("Brak zakończonych treningów")
+                    Text("No finished trainings")
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(viewModel.completed, id: \.id) { w in

@@ -21,41 +21,41 @@ struct WorkoutSummaryView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section(header: Text("Podsumowanie")) {
+                Section(header: Text("Summary")) {
                     HStack {
-                        Text("Trening")
+                        Text("Training")
                         Spacer()
                         Text(summary.routineName)
                             .foregroundStyle(.secondary)
                     }
                     HStack {
-                        Text("Czas")
+                        Text("Time")
                         Spacer()
                         Text(timeString)
                             .monospacedDigit()
                             .foregroundStyle(.secondary)
                     }
                     HStack {
-                        Text("Serie")
+                        Text("Sets")
                         Spacer()
                         Text("\(summary.totalSets)")
                             .foregroundStyle(.secondary)
                     }
                     HStack {
-                        Text("Powtórzenia")
+                        Text("Reps")
                         Spacer()
                         Text("\(summary.totalReps)")
                             .foregroundStyle(.secondary)
                     }
                     HStack {
-                        Text("Objętość")
+                        Text("Volume")
                         Spacer()
                         Text("\(formattedWeight(summary.totalVolumeKg)) kg")
                             .foregroundStyle(.secondary)
                     }
                     if let ex = summary.heaviestExerciseName, let w = summary.heaviestWeight {
                         HStack {
-                            Text("Najcięższe ćwiczenie")
+                            Text("Most heavy exercise")
                             Spacer()
                             Text("\(ex) • \(formattedWeight(w)) kg")
                                 .foregroundStyle(.secondary)
@@ -63,10 +63,10 @@ struct WorkoutSummaryView: View {
                     }
                 }
             }
-            .navigationTitle("Podsumowanie")
+            .navigationTitle("Summary")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Zamknij") { onClose() }
+                    Button("Close") { onClose() }
                 }
             }
         }

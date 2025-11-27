@@ -18,66 +18,64 @@ struct PersonalizeRoutineView: View {
     }
     
     var body: some View {
-        Form {
-            Section(header: Text("Nazwa rutyny")) {
-                TextField("Np. Push Day", text: $name)
-            }
-            
-            Section(header: Text("Parametry ćwiczeń")) {
-                ForEach($items) { $item in
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(item.exercise.name)
-                            .font(.headline)
-                        
-                        Stepper("Liczba serii: \(item.plan.count)", value: Binding(
-                            get: { item.plan.count },
-                            set: { newCount in
-                                adjustPlanCount(for: &item.plan, to: newCount)
-                            }
-                        ), in: 1...10)
-                        
-                        ForEach($item.plan) { $setPlan in
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("Seria \(seriesIndex(in: item.plan, id: setPlan.id) + 1)")
-                                    .font(.subheadline.bold())
-                                
-                                HStack {
-                                    Stepper("Powtórzenia: \(setPlan.reps)", value: $setPlan.reps, in: 1...50)
-                                }
-                                HStack {
-                                    Stepper("Ciężar: \(formattedWeight(setPlan.weight)) kg",
-                                            value: $setPlan.weight,
-                                            in: 0...500,
-                                            step: 2.5)
-                                }
-                            }
-                            .padding(.vertical, 4)
-                        }
-                        
-                        Stepper("Przerwa: \(item.restSeconds) s", value: $item.restSeconds, in: 15...600, step: 15)
-                    }
-                    .padding(.vertical, 6)
+        ScrollView {
+            VStack(spacing: 20) {
+                // Nazwa rutyny
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Routine name")
+                        .font(.headline)
+                    TextField("Push day", text: $name)
+                        .textFieldStyle(.roundedBorder)
                 }
-            }
-            
-            if let errorMessage {
-                Section { Text(errorMessage).foregroundStyle(.red) }
-            }
-            if saveSuccess {
-                Section { Label("Rutyna zapisana", systemImage: "checkmark.circle").foregroundStyle(.green) }
-            }
-            
-            Section {
+                .padding()
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                
+                // Ćwiczenia i parametry
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Personalize exercises")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 4)
+                    
+                    ForEach($items) { $item in
+                        ExerciseCard(item: $item)
+                    }
+                }
+                
+                if let errorMessage {
+                    Text(errorMessage)
+                        .foregroundStyle(.red)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 4)
+                }
+                if saveSuccess {
+                    Label("Routine saved", systemImage: "checkmark.circle")
+                        .foregroundStyle(.green)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 4)
+                }
+                
+                // Zapisz
                 Button {
                     Task { await saveRoutine() }
                 } label: {
-                    if isSaving { ProgressView() }
-                    else { Text("Zapisz rutynę").font(.headline) }
+                    HStack(spacing: 8) {
+                        if isSaving { ProgressView().tint(.white) }
+                        Text(isSaving ? "Saving…" : "Save routine")
+                            .font(.headline)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(items.isEmpty ? Color.gray.opacity(0.4) : Color.accentColor)
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
                 }
                 .disabled(items.isEmpty || isSaving)
             }
+            .padding(20)
         }
-        .navigationTitle("Personalizacja")
+        .navigationTitle("Personlalize")
         .onAppear {
             if items.isEmpty {
                 items = exercises.map { ex in
@@ -100,7 +98,7 @@ struct PersonalizeRoutineView: View {
         defer { isSaving = false }
         
         guard let auth = try? AuthenticationManager.shared.getAuthenticatedUser() else {
-            errorMessage = "Brak zalogowanego użytkownika."
+            errorMessage = "User no logged in."
             return
         }
         let routineName = name.isEmpty ? defaultName() : name
@@ -129,7 +127,7 @@ struct PersonalizeRoutineView: View {
             dismiss()
             dismiss()
         } catch {
-            errorMessage = "Nie udało się zapisać rutyny: \(error.localizedDescription)"
+            errorMessage = "Cannot save routine: \(error.localizedDescription)"
         }
     }
     
@@ -137,18 +135,6 @@ struct PersonalizeRoutineView: View {
     
     private func defaultPlan(sets: Int, reps: Int, weight: Double) -> [SetPlan] {
         (0..<sets).map { _ in SetPlan(reps: reps, weight: weight) }
-    }
-    
-    private func adjustPlanCount(for plan: inout [SetPlan], to newCount: Int) {
-        let current = plan.count
-        if newCount > current {
-            let template = plan.last ?? SetPlan(reps: 10, weight: 0)
-            for _ in current..<newCount {
-                plan.append(SetPlan(reps: template.reps, weight: template.weight))
-            }
-        } else if newCount < current {
-            plan.removeLast(current - newCount)
-        }
     }
     
     private func seriesIndex(in plan: [SetPlan], id: UUID) -> Int {
@@ -170,3 +156,99 @@ struct PersonalizeRoutineView: View {
         return "New Routine"
     }
 }
+
+private struct ExerciseCard: View {
+    @Binding var item: ExerciseInRoutine
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            // Nagłówek ćwiczenia
+            HStack(spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color.blue.opacity(0.12))
+                    Image(systemName: "figure.strengthtraining.traditional")
+                        .foregroundStyle(.blue)
+                }
+                .frame(width: 36, height: 36)
+                
+                Text(item.exercise.name)
+                    .font(.headline)
+                Spacer()
+            }
+            
+            // Liczba serii
+            HStack(spacing: 10) {
+                Image(systemName: "square.stack.3d.up")
+                    .foregroundStyle(.secondary)
+                Stepper("Number of sets: \(item.plan.count)", value: Binding(
+                    get: { item.plan.count },
+                    set: { newCount in
+                        adjustPlanCount(for: &item.plan, to: newCount)
+                    }
+                ), in: 1...10)
+            }
+            
+            // Seria x: reps + ciężar
+            VStack(spacing: 10) {
+                ForEach($item.plan) { $setPlan in
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Set \(seriesIndex(in: item.plan, id: setPlan.id) + 1)")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        
+                        HStack(spacing: 12) {
+                            Image(systemName: "repeat")
+                                .foregroundStyle(.secondary)
+                            Stepper("Reps: \(setPlan.reps)", value: $setPlan.reps, in: 1...50)
+                        }
+                        HStack(spacing: 12) {
+                            Image(systemName: "scalemass")
+                                .foregroundStyle(.secondary)
+                            Stepper("Weight: \(formattedWeight(setPlan.weight)) kg",
+                                    value: $setPlan.weight,
+                                    in: 0...500,
+                                    step: 2.5)
+                        }
+                    }
+                    .padding(12)
+                    .background(Color.gray.opacity(0.06), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }
+            }
+            
+            // Przerwa
+            HStack(spacing: 10) {
+                Image(systemName: "timer")
+                    .foregroundStyle(.secondary)
+                Stepper("Rest timer: \(item.restSeconds) s", value: $item.restSeconds, in: 15...600, step: 15)
+            }
+        }
+        .padding(16)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .shadow(color: .black.opacity(0.05), radius: 6, y: 3)
+    }
+    
+    // Helpers (lokalnie, by nie mieszać w logice widoku głównego)
+    private func adjustPlanCount(for plan: inout [SetPlan], to newCount: Int) {
+        let current = plan.count
+        if newCount > current {
+            let template = plan.last ?? SetPlan(reps: 10, weight: 0)
+            for _ in current..<newCount {
+                plan.append(SetPlan(reps: template.reps, weight: template.weight))
+            }
+        } else if newCount < current {
+            plan.removeLast(current - newCount)
+        }
+    }
+    private func seriesIndex(in plan: [SetPlan], id: UUID) -> Int {
+        plan.firstIndex { $0.id == id } ?? 0
+    }
+    private func formattedWeight(_ value: Double) -> String {
+        if value.truncatingRemainder(dividingBy: 1) == 0 {
+            return String(Int(value))
+        } else {
+            return String(format: "%.1f", value)
+        }
+    }
+}
+

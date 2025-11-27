@@ -45,4 +45,13 @@ final class RoutineManager {
     func deleteRoutine(userId: String, routineId: String) async throws {
         try await routinesCollection(userId: userId).document(routineId).delete()
     }
+    
+    // NEW: update existing routine by document id
+    func updateRoutine(userId: String, routineId: String, routine: DBRoutine) async throws {
+        // setData(from:, merge:true) to replace fields atomically
+        try routinesCollection(userId: userId)
+            .document(routineId)
+            .setData(from: routine, merge: true)
+    }
 }
+

@@ -12,7 +12,7 @@ struct MeasurementsView: View {
     
     var body: some View {
         List {
-            Section(header: Text("Pomiary")) {
+            Section(header: Text("Measurements")) {
                 ForEach(metrics) { metric in
                     NavigationLink {
                         MeasurementDetailView(metric: metric)

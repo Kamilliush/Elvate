@@ -14,12 +14,12 @@ enum MeasurementMetric: CaseIterable, Identifiable {
     var id: String { metricId }
     var title: String {
         switch self {
-        case .height: return "Wzrost"
-        case .weight: return "Waga"
-        case .waist:  return "Talia"
+        case .height: return "Height"
+        case .weight: return "Weight"
+        case .waist:  return "Wais"
         case .biceps: return "Biceps"
-        case .leg:    return "Udo"
-        case .chest:  return "Klatka"
+        case .leg:    return "Thigh"
+        case .chest:  return "Chest"
         }
     }
     var unit: String {
@@ -34,7 +34,7 @@ enum MeasurementMetric: CaseIterable, Identifiable {
         case .weight: return "weight"
         case .waist:  return "waist"
         case .biceps: return "biceps"
-        case .leg:    return "leg"
+        case .leg:    return "thigh"
         case .chest:  return "chest"
         }
     }
@@ -60,7 +60,7 @@ final class MeasurementDetailViewModel: ObservableObject {
         defer { isLoading = false }
         
         guard let auth = try? AuthenticationManager.shared.getAuthenticatedUser() else {
-            errorMessage = "Brak zalogowanego użytkownika."
+            errorMessage = "User no logged in."
             return
         }
         
@@ -74,7 +74,7 @@ final class MeasurementDetailViewModel: ObservableObject {
                 inputText = String(format: "%.1f", last.value)
             }
         } catch {
-            errorMessage = "Nie udało się pobrać historii: \(error.localizedDescription)"
+            errorMessage = "Cannot load history: \(error.localizedDescription)"
         }
     }
     
@@ -88,11 +88,11 @@ final class MeasurementDetailViewModel: ObservableObject {
         defer { isSaving = false }
         
         guard let auth = try? AuthenticationManager.shared.getAuthenticatedUser() else {
-            errorMessage = "Brak zalogowanego użytkownika."
+            errorMessage = "User no logged in."
             return
         }
         guard let newValue = parseDouble(inputText) else {
-            errorMessage = "Podaj poprawną wartość liczbową."
+            errorMessage = "Type correct number value."
             return
         }
         
@@ -104,7 +104,7 @@ final class MeasurementDetailViewModel: ObservableObject {
             )
             await load()
         } catch {
-            errorMessage = "Nie udało się zapisać: \(error.localizedDescription)"
+            errorMessage = "Cannot save \(error.localizedDescription)"
         }
     }
     
@@ -119,7 +119,7 @@ final class MeasurementDetailViewModel: ObservableObject {
                     documentId: id
                 )
             } catch {
-                errorMessage = "Nie udało się usunąć: \(error.localizedDescription)"
+                errorMessage = "Cannot delete: \(error.localizedDescription)"
             }
         }
         await load()

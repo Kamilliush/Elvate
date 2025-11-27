@@ -22,6 +22,10 @@ struct RoutineDetailView: View {
     // Wznawianie
     @State private var askResume: Bool = false
     
+    // Edit
+    @State private var showEdit: Bool = false
+    @EnvironmentObject private var routineStore: RoutineStore
+    
     var body: some View {
         List {
             headerSection
@@ -32,16 +36,16 @@ struct RoutineDetailView: View {
                         // PODGLĄD
                         ForEach(Array(state.item.plan.enumerated()), id: \.offset) { offset, p in
                             HStack {
-                                Text("Seria \(offset + 1)")
+                                Text("Set \(offset + 1)")
                                 Spacer()
-                                Text("\(p.reps) powt. • \(formattedWeight(p.weight)) kg")
+                                Text("\(p.reps) reps • \(formattedWeight(p.weight)) kg")
                                     .foregroundStyle(.secondary)
                             }
                         }
                         HStack {
                             Image(systemName: "timer")
                                 .foregroundStyle(.secondary)
-                            Text("Przerwa: \(state.item.restSeconds) s")
+                            Text("Rest timer: \(state.item.restSeconds) s")
                                 .foregroundStyle(.secondary)
                             Spacer()
                         }
@@ -50,7 +54,7 @@ struct RoutineDetailView: View {
                         if state.isCompleted {
                             HStack {
                                 Spacer()
-                                Label("Zakończono", systemImage: "checkmark.seal.fill")
+                                Label("Completed", systemImage: "checkmark.seal.fill")
                                     .foregroundStyle(.green)
                                 Spacer()
                             }
@@ -59,10 +63,10 @@ struct RoutineDetailView: View {
                         ForEach($state.setsProgress) { $set in
                             VStack(alignment: .leading, spacing: 8) {
                                 HStack {
-                                    Text("Seria \(set.index + 1)")
+                                    Text("Set \(set.index + 1)")
                                         .font(.headline)
                                     Spacer()
-                                    Toggle("Wykonana", isOn: $set.done)
+                                    Toggle("Done", isOn: $set.done)
                                         .labelsHidden()
                                         .onChange(of: set.done) { newValue in
                                             handleToggleDone(for: state.id, setIndex: set.index, newValue: newValue)
@@ -70,13 +74,13 @@ struct RoutineDetailView: View {
                                 }
                                 
                                 HStack {
-                                    Stepper("Powtórzenia: \(set.repsDone)",
+                                    Stepper("Reps: \(set.repsDone)",
                                             value: $set.repsDone,
                                             in: 0...max(100, state.item.plan[set.index].reps))
                                 }
                                 
                                 HStack {
-                                    Stepper("Ciężar: \(formattedWeight(set.weight)) kg",
+                                    Stepper("Weight: \(formattedWeight(set.weight)) kg",
                                             value: $set.weight,
                                             in: 0...500,
                                             step: 2.5)
@@ -97,7 +101,7 @@ struct RoutineDetailView: View {
                             .animation(.default, value: state.restRemaining)
                             
                             Button { stopRest(for: state.id) } label: {
-                                Text("Pomiń przerwę")
+                                Text("Skip rest")
                             }
                         }
                         
@@ -105,14 +109,14 @@ struct RoutineDetailView: View {
                             Button {
                                 markNextSetDone(for: state.id)
                             } label: {
-                                Text(state.nextSetIndexToComplete != nil ? "Zakończ następną serię" : "Wszystkie serie zakończone")
+                                Text(state.nextSetIndexToComplete != nil ? "Next set completed" : "All sets completed")
                             }
                             .disabled(state.nextSetIndexToComplete == nil || state.isResting)
                             
                             Spacer()
                             
                             if !state.isCompleted {
-                                Button("Zakończ ćwiczenie") {
+                                Button("Exercise completed") {
                                     finishExercise(for: state.id)
                                 }
                                 .disabled(!state.allSetsDone)
@@ -144,15 +148,15 @@ struct RoutineDetailView: View {
         .onDisappear {
             stopWorkoutTimer()
         }
-        .alert("Wznowić niedokończony trening?", isPresented: $askResume) {
+        .alert("Resume unfinished routine?", isPresented: $askResume) {
             Button("Nie", role: .cancel) {
                 // nic – zostaw podgląd
             }
-            Button("Wznów") {
+            Button("Resume") {
                 resumeIfAvailable()
             }
         } message: {
-            Text("Znaleziono zapisany stan treningu dla tej rutyny.")
+            Text("Routine in progress.")
         }
         .sheet(isPresented: $showSummary) {
             if let summary {
@@ -163,12 +167,28 @@ struct RoutineDetailView: View {
                 }
             }
         }
+        .toolbar {
+            if !isRunning {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showEdit = true
+                    } label: {
+                        Label("Edit", systemImage: "pencil")
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showEdit) {
+            EditRoutineView(routine: routine) { updated in
+                routineStore.update(updated)
+            }
+        }
     }
     
     // MARK: - Header
     
     private var headerSection: some View {
-        Section(header: Text("Rutyna")) {
+        Section(header: Text("Routine")) {
             Text(routine.name)
                 .font(.headline)
             
@@ -181,12 +201,12 @@ struct RoutineDetailView: View {
                     Button(role: .destructive) {
                         Task { await endAndSaveWorkout() }
                     } label: {
-                        Text("Zakończ trening")
+                        Text("End training")
                             .foregroundStyle(.red)
                     }
                 }
             } else {
-                Text("Ćwiczeń: \(routine.items.count)")
+                Text("Exercises: \(routine.items.count)")
                     .foregroundStyle(.secondary)
                 HStack {
                     Spacer()
@@ -239,7 +259,7 @@ struct RoutineDetailView: View {
         saveSuccess = false
         
         guard let auth = try? AuthenticationManager.shared.getAuthenticatedUser() else {
-            errorMessage = "Brak zalogowanego użytkownika."
+            errorMessage = "User no logged in."
             return
         }
         
@@ -286,7 +306,7 @@ struct RoutineDetailView: View {
             )
             showSummary = true
         } catch {
-            errorMessage = "Nie udało się zapisać zakończonego treningu: \(error.localizedDescription)"
+            errorMessage = "Failed to save completed training: \(error.localizedDescription)"
         }
     }
     
@@ -464,3 +484,4 @@ private extension RoutineDetailView {
         states[idx].restRemaining = 0
     }
 }
+
