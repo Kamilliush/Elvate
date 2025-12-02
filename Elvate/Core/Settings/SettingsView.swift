@@ -25,99 +25,229 @@ struct SettingsView: View {
     @State private var currentPassword = ""
     
     var body: some View {
-        List {
-            Button("Log out") {
-                Task {
-                    do {
-                        try viewModel.logOut()
-                        showSignInView = true
-                    } catch {
-                        print(error)
-                    }
+        ScrollView {
+            VStack(spacing: 20) {
+                accountCard
+                if viewModel.authPrioviders.contains(.email) {
+                    emailCard
                 }
+                helpCard
             }
-            
-            Button(role: .destructive) {
-                showDeleteAccountPopup = true
-            } label: {
-                Text("Delete Account")
-            }
-            
-            if viewModel.authPrioviders.contains(.email) {
-                emailSection
-            }
+            .padding(20)
         }
         .onAppear {
             viewModel.loadAuthProviders()
         }
-        .navigationBarTitle("Settings")
+        .navigationTitle("Settings")
+        .navigationBarTitleDisplayMode(.inline)
         
+        // Delete account
         .alert("Delete Account", isPresented: $showDeleteAccountPopup) {
-            SecureField("Aktualne hasło", text: $currentPassword)
+            SecureField("Current password", text: $currentPassword)
             
-            Button("Anuluj", role: .cancel) {
+            Button("Cancel", role: .cancel) {
                 currentPassword = ""
             }
-            Button("Zapisz") {
+            Button("Delete", role: .destructive) {
                 Task {
                     do {
                         try await viewModel.deleteAccount(currentPassword: currentPassword)
-                        print("Konto usunięte")
-                        // Wyczyść stan i pokaż ekran logowania
                         currentPassword = ""
                         showDeleteAccountPopup = false
                         showSignInView = true
                     } catch {
-                        // Błąd np. zły password: Firebase zwykle zwraca error code .wrongPassword / .requiresRecentLogin
-                        print("⚠️ Błąd podczas usuwania konta: \(error.localizedDescription)")
+                        print("Delete error: \(error.localizedDescription)")
                     }
                 }
             }
         } message: {
-            Text("Aby usunąć konto, wprowadź aktualne hasło.")
+            Text("To delete your account, please enter your current password.")
         }
-        .alert("Zmień e-mail", isPresented: $showUpdateEmailPopup) {
-            TextField("Nowy e-mail", text: $newEmail)
-            SecureField("Aktualne hasło", text: $currentPassword)
+        
+        // Update email
+        .alert("Change email", isPresented: $showUpdateEmailPopup) {
+            TextField("New email", text: $newEmail)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+            SecureField("Current password", text: $currentPassword)
             
-            Button("Anuluj", role: .cancel) {}
-            Button("Zapisz") {
+            Button("Cancel", role: .cancel) {}
+            Button("Send", role: .none) {
                 Task {
                     do {
                         try await viewModel.updateEmail(newEmail: newEmail, currentPassword: currentPassword)
-                        print("📩 Link weryfikacyjny wysłany na \(newEmail)")
+                        print("Verification link sent to \(newEmail)")
                     } catch {
-                        print("⚠️ Błąd: \(error.localizedDescription)")
+                        print("Email update error: \(error.localizedDescription)")
                     }
                 }
             }
         } message: {
-            Text("Podaj nowy e-mail oraz aktualne hasło, aby wysłać link weryfikacyjny.")
+            Text("Provide new email and your current password to send a verification link.")
         }
-        .alert("Zmień hasło", isPresented: $showUpdatePasswordPopup) {
-            SecureField("Aktualne hasło", text: $currentPassword)
-            SecureField("Nowe hasło", text: $newPassword)
+        
+        // Update password
+        .alert("Change password", isPresented: $showUpdatePasswordPopup) {
+            SecureField("Current password", text: $currentPassword)
+            SecureField("New password", text: $newPassword)
             
-            Button("Anuluj", role: .cancel) {}
-            Button("Zapisz") {
+            Button("Cancel", role: .cancel) {}
+            Button("Save") {
                 Task {
                     do {
                         try await viewModel.updatePassword(
                             currentPassword: currentPassword,
                             newPassword: newPassword
                         )
-                        print("✅ Hasło zostało zmienione!")
+                        print("Password changed.")
                     } catch {
-                        print("⚠️ Błąd: \(error.localizedDescription)")
+                        print("Password update error: \(error.localizedDescription)")
                     }
                 }
             }
         } message: {
-            Text("Podaj aktualne i nowe hasło, aby zaktualizować dane logowania.")
+            Text("Enter your current and new password to update your credentials.")
         }
     }
+    
+    // MARK: - Cards
+    
+    private var accountCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("Account", systemImage: "person.crop.circle")
+                    .font(.headline)
+                Spacer()
+            }
+            
+            VStack(spacing: 10) {
+                Button {
+                    Task {
+                        do {
+                            try viewModel.logOut()
+                            showSignInView = true
+                        } catch {
+                            print("Logout error:", error.localizedDescription)
+                        }
+                    }
+                } label: {
+                    rowButton(title: "Log out", icon: "rectangle.portrait.and.arrow.right", tint: .blue)
+                }
+                
+                Button(role: .destructive) {
+                    showDeleteAccountPopup = true
+                } label: {
+                    rowButton(title: "Delete account", icon: "trash", tint: .red)
+                }
+            }
+        }
+        .padding(16)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.06))
+        )
+        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+    }
+    
+    private var emailCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("Email & Security", systemImage: "envelope")
+                    .font(.headline)
+                Spacer()
+            }
+            
+            VStack(spacing: 10) {
+                Button {
+                    Task {
+                        do {
+                            try await viewModel.resetPassword()
+                            print("Password reset email sent.")
+                        } catch {
+                            print("Reset error:", error.localizedDescription)
+                        }
+                    }
+                } label: {
+                    rowButton(title: "Send password reset link", icon: "envelope.badge", tint: .orange)
+                }
+                
+                Button {
+                    showUpdatePasswordPopup = true
+                } label: {
+                    rowButton(title: "Change password", icon: "key.fill", tint: .purple)
+                }
+                
+                Button {
+                    showUpdateEmailPopup = true
+                } label: {
+                    rowButton(title: "Change email", icon: "at", tint: .green)
+                }
+            }
+        }
+        .padding(16)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.06))
+        )
+        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+    }
+    
+    private var helpCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("Help", systemImage: "questionmark.circle")
+                    .font(.headline)
+                Spacer()
+            }
+            
+            VStack(spacing: 10) {
+                Link(destination: URL(string: "https://support.apple.com/")!) {
+                    rowButton(title: "Support", icon: "lifepreserver", tint: .blue)
+                }
+                Link(destination: URL(string: "https://example.com/privacy")!) {
+                    rowButton(title: "Privacy policy", icon: "hand.raised.fill", tint: .teal)
+                }
+                Link(destination: URL(string: "https://example.com/terms")!) {
+                    rowButton(title: "Terms of service", icon: "doc.plaintext", tint: .gray)
+                }
+            }
+        }
+        .padding(16)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.06))
+        )
+        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+    }
+    
+    // MARK: - Reusable row
+    
+    private func rowButton(title: String, icon: String, tint: Color) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(tint.opacity(0.15))
+                Image(systemName: icon)
+                    .foregroundStyle(tint)
+            }
+            .frame(width: 34, height: 34)
+            
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+            
+            Spacer()
+            Image(systemName: "chevron.right")
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
 }
-
 
 #Preview {
     NavigationStack{
@@ -125,30 +255,3 @@ struct SettingsView: View {
     }
 }
 
-extension SettingsView {
-    private var emailSection: some View {
-        Section {
-            Button("Set reset Password link") {
-                Task {
-                    do {
-                        try await viewModel.resetPassword()
-                        print("Password reset!")
-                    } catch {
-                        print(error)
-                    }
-                }
-            }
-            
-            Button("Update Password") {
-                showUpdatePasswordPopup = true
-            }
-            
-            Button("Update email") {
-                showUpdateEmailPopup = true
-            }
-        } header: {
-            Text("Email Functions")
-        }
-
-    }
-}

@@ -13,8 +13,6 @@ struct RoutineDetailView: View {
     @State private var saveSuccess: Bool = false
     @Environment(\.dismiss) private var dismiss
     
-    // Heart rate pominęliśmy – zostaje na przyszłość
-    
     // Sheet podsumowania
     @State private var showSummary: Bool = false
     @State private var summary: WorkoutSummary? = nil
@@ -25,6 +23,14 @@ struct RoutineDetailView: View {
     // Edit
     @State private var showEdit: Bool = false
     @EnvironmentObject private var routineStore: RoutineStore
+    
+    // Lokalna kopia modelu do UI (aktualizowana z RoutineStore)
+    @State private var currentRoutine: Routine
+    
+    init(routine: Routine) {
+        self.routine = routine
+        _currentRoutine = State(initialValue: routine)
+    }
     
     var body: some View {
         List {
@@ -134,19 +140,23 @@ struct RoutineDetailView: View {
             }
         }
         .id(isRunning)
-        .navigationTitle(routine.name)
+        .navigationTitle(currentRoutine.name)
         .onAppear {
             if states.isEmpty {
-                states = routine.items.map { RuntimeExerciseState(item: $0) }
+                states = currentRoutine.items.map { RuntimeExerciseState(item: $0) }
             }
             // sprawdź, czy jest trening w toku dla tej rutyny
-            if let inProgress = WorkoutInProgressStore.shared.load(routineName: routine.name) {
+            if let _ = WorkoutInProgressStore.shared.load(routineName: currentRoutine.name) {
                 // podpowiedz wznowienie
                 askResume = true
             }
         }
         .onDisappear {
             stopWorkoutTimer()
+        }
+        // Reaguj na zmiany w RoutineStore i aktualizuj currentRoutine + states (jeśli nie trwa trening)
+        .onReceive(routineStore.$routines) { _ in
+            syncWithStoreIfUpdated()
         }
         .alert("Resume unfinished routine?", isPresented: $askResume) {
             Button("Nie", role: .cancel) {
@@ -179,8 +189,10 @@ struct RoutineDetailView: View {
             }
         }
         .sheet(isPresented: $showEdit) {
-            EditRoutineView(routine: routine) { updated in
+            EditRoutineView(routine: currentRoutine) { updated in
                 routineStore.update(updated)
+                // Po zapisie zaktualizuj lokalny stan natychmiast
+                syncAfterEdit(updated: updated)
             }
         }
     }
@@ -189,7 +201,7 @@ struct RoutineDetailView: View {
     
     private var headerSection: some View {
         Section(header: Text("Routine")) {
-            Text(routine.name)
+            Text(currentRoutine.name)
                 .font(.headline)
             
             if isRunning {
@@ -206,7 +218,7 @@ struct RoutineDetailView: View {
                     }
                 }
             } else {
-                Text("Exercises: \(routine.items.count)")
+                Text("Exercises: \(currentRoutine.items.count)")
                     .foregroundStyle(.secondary)
                 HStack {
                     Spacer()
@@ -226,6 +238,34 @@ struct RoutineDetailView: View {
         let m = workoutElapsedSeconds / 60
         let s = workoutElapsedSeconds % 60
         return String(format: "%02d:%02d", m, s)
+    }
+    
+    // MARK: - Sync helpers
+    
+    private func syncWithStoreIfUpdated() {
+        // Znajdź odpowiadającą rutynę w store po dbId (lub po nazwie fallback)
+        let updated: Routine? = {
+            if let dbId = routine.dbId {
+                return routineStore.routines.first(where: { $0.dbId == dbId })
+            } else {
+                return routineStore.routines.first(where: { $0.name == routine.name })
+            }
+        }()
+        guard let updated else { return }
+        // Jeśli coś się zmieniło – podmień currentRoutine i ewentualnie odśwież states (tylko gdy nie trwa trening)
+        if updated != currentRoutine {
+            currentRoutine = updated
+            if !isRunning {
+                states = currentRoutine.items.map { RuntimeExerciseState(item: $0) }
+            }
+        }
+    }
+    
+    private func syncAfterEdit(updated: Routine) {
+        currentRoutine = updated
+        if !isRunning {
+            states = updated.items.map { RuntimeExerciseState(item: $0) }
+        }
     }
     
     // MARK: - Workout timer control
@@ -277,7 +317,7 @@ struct RoutineDetailView: View {
         
         let completed = DBCompletedWorkout(
             routineId: nil,
-            routineName: routine.name,
+            routineName: currentRoutine.name,
             dateCompleted: Date(),
             durationSeconds: workoutElapsedSeconds,
             exercises: completedExercises
@@ -287,7 +327,7 @@ struct RoutineDetailView: View {
             try await CompletedWorkoutsManager.shared.addCompletedWorkout(userId: auth.uid, workout: completed)
             saveSuccess = true
             // usuń stan in-progress
-            WorkoutInProgressStore.shared.clear(routineName: routine.name)
+            WorkoutInProgressStore.shared.clear(routineName: currentRoutine.name)
             // policz podsumowanie i pokaż sheet
             let runtimeSnapshots = states.map { st in
                 RuntimeExerciseSnapshot(
@@ -300,7 +340,7 @@ struct RoutineDetailView: View {
                 )
             }
             summary = WorkoutSummary.from(
-                routineName: routine.name,
+                routineName: currentRoutine.name,
                 durationSeconds: workoutElapsedSeconds,
                 states: runtimeSnapshots
             )
@@ -325,19 +365,19 @@ struct RoutineDetailView: View {
             )
         }
         let data = WorkoutInProgress(
-            routineName: routine.name,
+            routineName: currentRoutine.name,
             startedAt: Date(),
             elapsedSeconds: workoutElapsedSeconds,
             exercises: snapshots
         )
-        WorkoutInProgressStore.shared.save(routineName: routine.name, data: data)
+        WorkoutInProgressStore.shared.save(routineName: currentRoutine.name, data: data)
     }
     
     private func resumeIfAvailable() {
-        guard let saved = WorkoutInProgressStore.shared.load(routineName: routine.name) else { return }
+        guard let saved = WorkoutInProgressStore.shared.load(routineName: currentRoutine.name) else { return }
         // odtwórz stany
         if states.isEmpty {
-            states = routine.items.map { RuntimeExerciseState(item: $0) }
+            states = currentRoutine.items.map { RuntimeExerciseState(item: $0) }
         }
         // mapuj z saved.exercises do states
         for i in states.indices {
@@ -484,4 +524,3 @@ private extension RoutineDetailView {
         states[idx].restRemaining = 0
     }
 }
-

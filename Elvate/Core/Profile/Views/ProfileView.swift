@@ -45,7 +45,6 @@ final class ProfileViewModel: ObservableObject {
             return
         }
         do {
-            // pobierz całą historię wagi (lub limit, jeśli chcesz)
             let items = try await MeasurementsManager.shared.fetchMetricEntries(
                 userId: auth.uid,
                 metricId: MeasurementMetric.weight.metricId
@@ -95,130 +94,40 @@ struct ProfileView: View {
     private func preferenceIsSelected( text: String) -> Bool {
         viewModel.user?.preferences?.contains(text) == true
     }
+    
+    // MARK: - Header helpers
+    
+    private var userInitials: String {
+        if let email = viewModel.user?.email, let first = email.first {
+            return String(first).uppercased()
+        }
+        return "U"
+    }
+    
+    private var isPremium: Bool {
+        viewModel.user?.isPremium ?? false
+    }
+    
+    private var userEmail: String {
+        viewModel.user?.email ?? "Unknown"
+    }
+    
+    private var avatarURL: URL? {
+        guard let urlString = viewModel.user?.photoUrl, let url = URL(string: urlString) else { return nil }
+        return url
+    }
+    
+    // MARK: - Body
+    
     var body: some View {
-        List {
-            // Navigation to MeasurementsView
-            Section {
-                NavigationLink {
-                    MeasurementsView()
-                } label: {
-                    HStack {
-                        Image(systemName: "ruler")
-                            .foregroundStyle(.blue)
-                        Text("Measurements")
-                            .font(.headline)
-                    }
-                }
+        ScrollView {
+            VStack(spacing: 20) {
+                profileHeader
+                weightCard
+                finishedWorkoutsCard
+                measurementsShortcutCard
             }
-            
-            // Wykres historii wagi
-            Section(header: Text("Weight")) {
-                if viewModel.isLoadingWeight {
-                    ProgressView()
-                        .frame(maxWidth: .infinity, alignment: .center)
-                } else if let err = viewModel.weightError {
-                    VStack(spacing: 8) {
-                        Text(err)
-                            .foregroundStyle(.red)
-                        Button("Try again") {
-                            Task { await viewModel.loadWeightHistory() }
-                        }
-                    }
-                } else if viewModel.weightHistory.isEmpty {
-                    Text("No weight data")
-                        .foregroundStyle(.secondary)
-                } else {
-                    let values = viewModel.weightHistory.map { $0.value }
-                    let minVal = values.min() ?? 0
-                    let maxVal = values.max() ?? 0
-                    let span = max(maxVal - minVal, 0)
-                    // Margines: 10% rozpiętości lub minimum 0.5 kg
-                    let padding = max(span * 0.1, 0.5)
-                    let lower = (span == 0) ? (minVal - 0.5) : (minVal - padding)
-                    let upper = (span == 0) ? (maxVal + 0.5) : (maxVal + padding)
-                    
-                    Chart {
-                        ForEach(viewModel.weightHistory, id: \.id) { e in
-                            LineMark(
-                                x: .value("Date", e.dateCreated),
-                                y: .value("Weight (kg)", e.value)
-                            )
-                            PointMark(
-                                x: .value("Date", e.dateCreated),
-                                y: .value("Weight (kg)", e.value)
-                            )
-                        }
-                    }
-                    .chartYScale(domain: lower...upper)
-                    .frame(height: 220)
-                  
-                }
-            }
-            
-//            if let user = viewModel.user {
-//                Text("userId: \(user.userId)")
-//                
-//                Button {
-//                    Task {
-//                        do {
-//                            try await viewModel.togglePremiumStatus()
-//                        } catch {
-//                            print("Toggle premium failed: \(error)")
-//                        }
-//                    }
-//                } label: {
-//                    Text ("User is premium: \((user.isPremium ?? false).description.capitalized)")
-//                }
-//                
-//                VStack{
-//                    
-//                    HStack {
-//                        ForEach(preferenceOptions, id: \.self) { string in
-//                            Button(string) {
-//                                if preferenceIsSelected(text: string) {
-//                                    viewModel.removeUserPreference(text: string)
-//                                } else {
-//                                    viewModel.addUserPreference(text: string)
-//                                }
-//                            }
-//                            .font(.headline)
-//                            .buttonStyle(.borderedProminent)
-//                            .tint(preferenceIsSelected(text: string) == true ? .green: .red)
-//                        }
-//                    }
-//                    
-//                    Text("user preferences: \((user.preferences ?? []).joined(separator: ", "))")
-//                        .frame(maxWidth: .infinity, alignment: .leading)
-//                }
-//            }
-            
-            // Zakończone treningi
-            Section(header: Text("Finished trainings")) {
-                if viewModel.completed.isEmpty {
-                    Text("No finished trainings")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(viewModel.completed, id: \.id) { w in
-                        NavigationLink {
-                            CompletedWorkoutDetailView(workout: w)
-                        } label: {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(w.routineName)
-                                    .font(.headline)
-                                HStack {
-                                    Text(w.dateCompleted.formatted(date: .abbreviated, time: .shortened))
-                                    Spacer()
-                                    Text(timeString(w.durationSeconds))
-                                        .monospacedDigit()
-                                        .foregroundStyle(.secondary)
-                                }
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
-            }
+            .padding(20)
         }
         .task {
             try? await viewModel.loadCurrentUser()
@@ -226,6 +135,365 @@ struct ProfileView: View {
             await viewModel.loadWeightHistory()
         }
         .navigationTitle("Profile")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+    
+    // MARK: - Sections
+    
+    private var profileHeader: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 16) {
+                avatarView
+                    .frame(width: 64, height: 64)
+                    .overlay(
+                        Circle().strokeBorder(.white.opacity(0.6), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
+                
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        Text("User")
+                            .font(.headline)
+                        if isPremium {
+                            Label("Premium", systemImage: "star.fill")
+                                .font(.caption2.weight(.semibold))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(Color.yellow.opacity(0.2))
+                                .foregroundColor(.yellow)
+                                .clipShape(Capsule())
+                                .accessibilityLabel("Premium account")
+                        }
+                    }
+                    Text(userEmail)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            
+            HStack(spacing: 10) {
+                NavigationLink {
+                    MeasurementsView()
+                } label: {
+                    Label("Measurements", systemImage: "ruler")
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(.thinMaterial)
+                        .clipShape(Capsule())
+                }
+                // Usunięto przycisk Enable/Disable Premium zgodnie z prośbą
+            }
+        }
+        .padding(16)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.accentColor.opacity(0.25),
+                    Color.blue.opacity(0.12)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(.white.opacity(0.15))
+        )
+    }
+    
+    private var avatarView: some View {
+        Group {
+            if let url = avatarURL {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .empty:
+                        ZStack {
+                            Circle().fill(Color.gray.opacity(0.2))
+                            ProgressView()
+                        }
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    case .failure:
+                        placeholderAvatar
+                    @unknown default:
+                        placeholderAvatar
+                    }
+                }
+                .clipShape(Circle())
+            } else {
+                placeholderAvatar
+            }
+        }
+    }
+    
+    private var placeholderAvatar: some View {
+        ZStack {
+            Circle().fill(Color.blue.opacity(0.15))
+            Text(userInitials)
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(.blue)
+        }
+    }
+    
+    private var weightCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("Weight", systemImage: "scalemass")
+                    .font(.headline)
+                Spacer()
+                if let last = viewModel.weightHistory.last?.value {
+                    let delta = weightDelta()
+                    HStack(spacing: 6) {
+                        Text(String(format: "%.1f kg", last))
+                            .font(.subheadline.weight(.semibold))
+                        if let delta {
+                            let up = delta > 0
+                            Image(systemName: up ? "arrow.up.right" : "arrow.down.right")
+                                .foregroundStyle(up ? .red : .green)
+                            Text(String(format: "%+.1f", delta))
+                                .foregroundStyle(up ? .red : .green)
+                                .font(.caption.weight(.semibold))
+                        }
+                    }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Last weight \(String(format: "%.1f", last)) kilograms")
+                }
+            }
+            
+            Group {
+                if viewModel.isLoadingWeight {
+                    HStack {
+                        ProgressView()
+                        Text("Loading weight history…")
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 12)
+                } else if let err = viewModel.weightError {
+                    VStack(spacing: 8) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                            Text(err).foregroundStyle(.secondary)
+                        }
+                        Button {
+                            Task { await viewModel.loadWeightHistory() }
+                        } label: {
+                            Text("Try again")
+                                .font(.headline)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(Color.blue.opacity(0.12))
+                                .clipShape(Capsule())
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                } else if viewModel.weightHistory.isEmpty {
+                    VStack(spacing: 8) {
+                        Image(systemName: "scalemass")
+                            .font(.system(size: 36))
+                            .foregroundStyle(.secondary)
+                        Text("No weight data")
+                            .font(.headline)
+                        Text("Add your first measurement to see trends.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        NavigationLink {
+                            MeasurementDetailView(metric: .weight)
+                        } label: {
+                            Text("Add measurement")
+                                .font(.headline)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 10)
+                                .background(Color.accentColor)
+                                .foregroundColor(.white)
+                                .clipShape(Capsule())
+                        }
+                        .padding(.top, 4)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                } else {
+                    let values = viewModel.weightHistory.map { $0.value }
+                    let minVal = values.min() ?? 0
+                    let maxVal = values.max() ?? 0
+                    let span = max(maxVal - minVal, 0)
+                    let padding = max(span * 0.1, 0.5)
+                    let lower = (span == 0) ? (minVal - 0.5) : (minVal - padding)
+                    let upper = (span == 0) ? (maxVal + 0.5) : (maxVal + padding)
+                    
+                    Chart {
+                        ForEach(viewModel.weightHistory, id: \.id) { e in
+                            // Ostry wykres: bez interpolacji i bez AreaMark
+                            LineMark(
+                                x: .value("Date", e.dateCreated),
+                                y: .value("Weight (kg)", e.value)
+                            )
+                            .foregroundStyle(.blue)
+                            
+                            PointMark(
+                                x: .value("Date", e.dateCreated),
+                                y: .value("Weight (kg)", e.value)
+                            )
+                            .symbolSize(20)
+                            .foregroundStyle(.blue)
+                        }
+                    }
+                    .chartYAxis {
+                        AxisMarks(position: .leading)
+                    }
+                    .chartXAxis {
+                        AxisMarks(values: .automatic(desiredCount: 4))
+                    }
+                    .chartYScale(domain: lower...upper)
+                    .frame(height: 220)
+                }
+            }
+        }
+        .padding(16)
+        // Tło tylko dla karty (nie rozciąga się poza jej treść)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.06))
+        )
+        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+    }
+    
+    private var finishedWorkoutsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("Finished trainings", systemImage: "checkmark.circle")
+                    .font(.headline)
+                Spacer()
+            }
+            
+            if viewModel.completed.isEmpty {
+                HStack(spacing: 12) {
+                    Image(systemName: "list.bullet.rectangle.portrait")
+                        .font(.system(size: 28))
+                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("No finished trainings")
+                            .font(.headline)
+                        Text("Start a workout and it will appear here.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+                .padding(.vertical, 4)
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(viewModel.completed.prefix(10), id: \.id) { w in
+                        NavigationLink {
+                            CompletedWorkoutDetailView(workout: w)
+                        } label: {
+                            workoutRow(w)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.06))
+        )
+        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+    }
+    
+    private func workoutRow(_ w: DBCompletedWorkout) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.green.opacity(0.14))
+                Image(systemName: "figure.strengthtraining.traditional")
+                    .foregroundStyle(.green)
+            }
+            .frame(width: 44, height: 44)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(w.routineName)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                HStack(spacing: 8) {
+                    Text(w.dateCompleted.formatted(date: .abbreviated, time: .shortened))
+                    Text("•")
+                    Text(timeString(w.durationSeconds))
+                        .monospacedDigit()
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .foregroundStyle(.secondary)
+        }
+        .padding(10)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+    
+    private var measurementsShortcutCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("Quick actions", systemImage: "bolt.fill")
+                    .font(.headline)
+                Spacer()
+            }
+            HStack(spacing: 12) {
+                NavigationLink {
+                    MeasurementsView()
+                } label: {
+                    quickActionButton(title: "Measurements", icon: "ruler", tint: .blue)
+                }
+                
+                NavigationLink {
+                    MeasurementDetailView(metric: .weight)
+                } label: {
+                    quickActionButton(title: "Add weight", icon: "scalemass", tint: .purple)
+                }
+            }
+        }
+        .padding(16)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.06))
+        )
+        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+    }
+    
+    private func quickActionButton(title: String, icon: String, tint: Color) -> some View {
+        HStack(spacing: 10) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(tint.opacity(0.15))
+                Image(systemName: icon)
+                    .foregroundStyle(tint)
+            }
+            .frame(width: 34, height: 34)
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+    
+    // MARK: - Utils
+    
+    private func weightDelta() -> Double? {
+        let arr = viewModel.weightHistory
+        guard arr.count >= 2, let last = arr.last?.value, let prev = arr.dropLast().last?.value else { return nil }
+        return last - prev
     }
     
     private func timeString(_ seconds: Int) -> String {
@@ -237,7 +505,8 @@ struct ProfileView: View {
 
 struct ProfileView_Previews: PreviewProvider {
     static var previews: some View {
-        RootView()
+        NavigationStack {
+            ProfileView(showSignInView: .constant(false))
+        }
     }
 }
-

@@ -21,6 +21,8 @@ struct ExercisesView: View {
     }
     
     @State private var selectedIds: Set<String> = []
+    // NOWE: zapamiętujemy kolejność kliknięć
+    @State private var selectionOrder: [String] = []
     
     // Wyszukiwanie i filtrowanie
     @State private var searchText: String = ""
@@ -84,16 +86,20 @@ struct ExercisesView: View {
                                     .lineLimit(1)
                             }
                         }
-                        
-                       
                     }
                     .contentShape(Rectangle())
                     .onTapGesture {
                         guard selectionMode else { return }
                         if selectedIds.contains(exercise.id) {
+                            // odznaczenie: usuń z Set i z kolejności
                             selectedIds.remove(exercise.id)
+                            if let idx = selectionOrder.firstIndex(of: exercise.id) {
+                                selectionOrder.remove(at: idx)
+                            }
                         } else {
+                            // zaznaczenie: dodaj do Set i na koniec kolejności
                             selectedIds.insert(exercise.id)
+                            selectionOrder.append(exercise.id)
                         }
                     }
                     .padding(.vertical, 4)
@@ -103,8 +109,11 @@ struct ExercisesView: View {
                     if selectionMode {
                         ToolbarItem(placement: .bottomBar) {
                             Button {
-                                let selected = viewModel.exercises.filter { selectedIds.contains($0.id) }
-                                onContinue?(selected)
+                                // Zbuduj wynik w kolejności kliknięć
+                                let selectedByTapOrder: [Exercise] = selectionOrder.compactMap { id in
+                                    viewModel.exercises.first(where: { $0.id == id })
+                                }
+                                onContinue?(selectedByTapOrder)
                             } label: {
                                 Text("Next (\(selectedIds.count))")
                                     .font(.headline)
@@ -159,6 +168,14 @@ struct ExercisesView: View {
         .navigationTitle("Exercises")
         .task {
             await viewModel.loadExercises()
+        }
+        .onChange(of: selectedIds) { _, _ in
+            // Synchronizacja selectionOrder, gdyby zaznaczenie zmieniło się przez systemowy multi-select
+            selectionOrder = selectionOrder.filter { selectedIds.contains($0) }
+            // Dodaj ewentualnie nowe zaznaczenia, których jeszcze nie ma w kolejności
+            for id in selectedIds where !selectionOrder.contains(id) {
+                selectionOrder.append(id)
+            }
         }
     }
 }

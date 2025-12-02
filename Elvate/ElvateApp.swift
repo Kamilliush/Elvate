@@ -18,9 +18,11 @@ struct ElvateApp: App {
         WindowGroup {
             NavigationStack{
                 RootView()
-                    .environmentObject(routineStore)
-                    .preferredColorScheme(.dark)
+                    
+                    
             }
+            .environmentObject(routineStore)
+            .preferredColorScheme(.dark)
         }
     }
 }
