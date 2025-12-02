@@ -410,13 +410,14 @@ struct ProfileView: View {
     }
     
     private func workoutRow(_ w: DBCompletedWorkout) -> some View {
-        let icon = w.routineIconName ?? "figure.strengthtraining.traditional" // fallback dla starych wpisów
+        let icon = w.routineIconName ?? "figure.strengthtraining.traditional"
+        let tint = iconTint(for: icon)
         return HStack(alignment: .center, spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.green.opacity(0.14))
+                    .fill(tint.opacity(0.14))
                 Image(systemName: icon)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(tint)
             }
             .frame(width: 44, height: 44)
             

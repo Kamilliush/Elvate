@@ -212,12 +212,13 @@ private struct RoutineRow: View {
     let inProgress: Bool
     
     var body: some View {
+        let tint = iconTint(for: routine.iconName)
         HStack(alignment: .center, spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.blue.opacity(0.12))
+                    .fill(tint.opacity(0.12))
                 Image(systemName: routine.iconName)
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(tint)
             }
             .frame(width: 44, height: 44)
             
@@ -254,4 +255,3 @@ private struct RoutineRow: View {
     WorkoutView()
         .environmentObject(RoutineStore())
 }
-

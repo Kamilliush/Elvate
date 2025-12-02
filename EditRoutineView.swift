@@ -181,18 +181,19 @@ private struct IconGridInline: View {
     var body: some View {
         LazyVGrid(columns: columns, spacing: 8) {
             ForEach(icons, id: \.self) { icon in
+                let tint = iconTint(for: icon)
                 Button {
                     selected = icon
                 } label: {
                     ZStack {
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(selected == icon ? Color.accentColor.opacity(0.2) : Color.gray.opacity(0.08))
+                            .fill(selected == icon ? tint.opacity(0.18) : Color.gray.opacity(0.08))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .stroke(selected == icon ? Color.accentColor : Color.clear, lineWidth: 2)
+                                    .stroke(selected == icon ? tint : Color.clear, lineWidth: 2)
                             )
                         Image(systemName: icon)
-                            .foregroundStyle(selected == icon ? Color.accentColor : Color.primary)
+                            .foregroundStyle(selected == icon ? tint : Color.primary)
                     }
                     .frame(height: 36)
                 }
@@ -202,4 +203,3 @@ private struct IconGridInline: View {
         .padding(.vertical, 6)
     }
 }
-

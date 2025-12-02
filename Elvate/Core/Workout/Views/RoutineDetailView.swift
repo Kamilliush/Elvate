@@ -201,12 +201,13 @@ struct RoutineDetailView: View {
     
     private var headerSection: some View {
         Section(header: Text("Routine")) {
+            let tint = iconTint(for: currentRoutine.iconName)
             HStack(spacing: 12) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Color.blue.opacity(0.12))
+                        .fill(tint.opacity(0.12))
                     Image(systemName: currentRoutine.iconName)
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(tint)
                 }
                 .frame(width: 36, height: 36)
                 
