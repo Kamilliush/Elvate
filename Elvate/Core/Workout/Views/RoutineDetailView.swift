@@ -201,8 +201,24 @@ struct RoutineDetailView: View {
     
     private var headerSection: some View {
         Section(header: Text("Routine")) {
-            Text(currentRoutine.name)
-                .font(.headline)
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color.blue.opacity(0.12))
+                    Image(systemName: currentRoutine.iconName)
+                        .foregroundStyle(.blue)
+                }
+                .frame(width: 36, height: 36)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(currentRoutine.name)
+                        .font(.headline)
+                    Text("Exercises: \(currentRoutine.items.count)")
+                        .foregroundStyle(.secondary)
+                        .font(.subheadline)
+                }
+                Spacer()
+            }
             
             if isRunning {
                 HStack {
@@ -218,8 +234,6 @@ struct RoutineDetailView: View {
                     }
                 }
             } else {
-                Text("Exercises: \(currentRoutine.items.count)")
-                    .foregroundStyle(.secondary)
                 HStack {
                     Spacer()
                     Button {
@@ -318,6 +332,7 @@ struct RoutineDetailView: View {
         let completed = DBCompletedWorkout(
             routineId: nil,
             routineName: currentRoutine.name,
+            routineIconName: currentRoutine.iconName, // ZAPISZ IKONĘ RUTYNY
             dateCompleted: Date(),
             durationSeconds: workoutElapsedSeconds,
             exercises: completedExercises

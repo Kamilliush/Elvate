@@ -20,6 +20,7 @@ struct DBCompletedWorkout: Codable, Identifiable {
     @DocumentID var id: String?
     var routineId: String?          // opcjonalnie
     var routineName: String
+    var routineIconName: String?    // ZMIANA: opcjonalne dla zgodności ze starymi dokumentami
     var dateCompleted: Date
     var durationSeconds: Int
     var exercises: [DBCompletedExercise]

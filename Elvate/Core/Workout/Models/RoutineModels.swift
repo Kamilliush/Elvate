@@ -20,5 +20,6 @@ struct Routine: Identifiable, Hashable {
     var name: String
     var items: [ExerciseInRoutine]
     var dateCreated: Date = Date()
+    var iconName: String = "figure.strengthtraining.traditional"
 }
 

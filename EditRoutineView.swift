@@ -9,14 +9,29 @@ struct EditRoutineView: View {
     
     @State private var name: String
     @State private var items: [ExerciseInRoutine]
+    @State private var iconName: String
     @State private var isSaving: Bool = false
     @State private var errorMessage: String? = nil
+    
+    private let availableIcons: [String] = [
+        "figure.strengthtraining.traditional",
+        "dumbbell",
+        "figure.run",
+        "figure.walk",
+        "bicycle",
+        "heart.fill",
+        "flame.fill",
+        "bolt.fill",
+        "star.fill",
+        "leaf.fill"
+    ]
     
     init(routine: Routine, onSaved: @escaping (Routine) -> Void) {
         self.routine = routine
         self.onSaved = onSaved
         _name = State(initialValue: routine.name)
         _items = State(initialValue: routine.items)
+        _iconName = State(initialValue: routine.iconName)
     }
     
     var body: some View {
@@ -24,6 +39,10 @@ struct EditRoutineView: View {
             Form {
                 Section(header: Text("Nazwa rutyny")) {
                     TextField("Np. Push Day", text: $name)
+                }
+                
+                Section(header: Text("Ikona rutyny")) {
+                    IconGridInline(icons: availableIcons, selected: $iconName)
                 }
                 
                 Section(header: Text("Parametry ćwiczeń")) {
@@ -110,13 +129,15 @@ struct EditRoutineView: View {
             id: docId,
             name: name.isEmpty ? routine.name : name,
             dateCreated: routine.dateCreated,
-            items: dbItems
+            items: dbItems,
+            iconName: iconName
         )
         
         do {
             try await RoutineManager.shared.updateRoutine(userId: auth.uid, routineId: docId, routine: dbRoutine)
             // update local store model
-            let updated = Routine(dbId: docId, name: dbRoutine.name, items: items, dateCreated: dbRoutine.dateCreated)
+            var updated = Routine(dbId: docId, name: dbRoutine.name, items: items, dateCreated: dbRoutine.dateCreated)
+            updated.iconName = iconName
             onSaved(updated)
             dismiss()
         } catch {
@@ -148,6 +169,37 @@ struct EditRoutineView: View {
         } else {
             return String(format: "%.1f", value)
         }
+    }
+}
+
+private struct IconGridInline: View {
+    let icons: [String]
+    @Binding var selected: String
+    
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 5)
+    
+    var body: some View {
+        LazyVGrid(columns: columns, spacing: 8) {
+            ForEach(icons, id: \.self) { icon in
+                Button {
+                    selected = icon
+                } label: {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(selected == icon ? Color.accentColor.opacity(0.2) : Color.gray.opacity(0.08))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .stroke(selected == icon ? Color.accentColor : Color.clear, lineWidth: 2)
+                            )
+                        Image(systemName: icon)
+                            .foregroundStyle(selected == icon ? Color.accentColor : Color.primary)
+                    }
+                    .frame(height: 36)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.vertical, 6)
     }
 }
 

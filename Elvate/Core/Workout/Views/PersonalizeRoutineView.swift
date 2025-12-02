@@ -13,6 +13,21 @@ struct PersonalizeRoutineView: View {
     @State private var errorMessage: String? = nil
     @State private var saveSuccess: Bool = false
     
+    // Ikony do wyboru
+    private let availableIcons: [String] = [
+        "figure.strengthtraining.traditional",
+        "dumbbell",
+        "figure.run",
+        "figure.walk",
+        "bicycle",
+        "heart.fill",
+        "flame.fill",
+        "bolt.fill",
+        "star.fill",
+        "leaf.fill"
+    ]
+    @State private var selectedIconName: String = "figure.strengthtraining.traditional"
+    
     init(exercises: [Exercise]) {
         self.exercises = exercises
     }
@@ -29,6 +44,16 @@ struct PersonalizeRoutineView: View {
                 }
                 .padding()
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                
+                // Wybór ikony
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Choose icon")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 4)
+                    
+                    IconGrid(icons: availableIcons, selected: $selectedIconName)
+                }
                 
                 // Ćwiczenia i parametry
                 VStack(alignment: .leading, spacing: 12) {
@@ -115,13 +140,15 @@ struct PersonalizeRoutineView: View {
             id: nil,
             name: routineName,
             dateCreated: Date(),
-            items: dbItems
+            items: dbItems,
+            iconName: selectedIconName
         )
         
         do {
             try await RoutineManager.shared.addRoutine(userId: auth.uid, routine: dbRoutine)
-            // Opcjonalnie aktualizuj lokalny store, aby UI od razu widziało
-            let uiRoutine = Routine(name: routineName, items: items)
+            // Aktualizuj lokalny store, aby UI od razu widziało
+            var uiRoutine = Routine(name: routineName, items: items)
+            uiRoutine.iconName = selectedIconName
             routineStore.add(uiRoutine)
             saveSuccess = true
             dismiss()
@@ -154,6 +181,38 @@ struct PersonalizeRoutineView: View {
             return "\(first.capitalized) Routine"
         }
         return "New Routine"
+    }
+}
+
+private struct IconGrid: View {
+    let icons: [String]
+    @Binding var selected: String
+    
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 5)
+    
+    var body: some View {
+        LazyVGrid(columns: columns, spacing: 10) {
+            ForEach(icons, id: \.self) { icon in
+                Button {
+                    selected = icon
+                } label: {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(selected == icon ? Color.accentColor.opacity(0.2) : Color.gray.opacity(0.08))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .stroke(selected == icon ? Color.accentColor : Color.clear, lineWidth: 2)
+                            )
+                        Image(systemName: icon)
+                            .foregroundStyle(selected == icon ? Color.accentColor : Color.primary)
+                    }
+                    .frame(height: 44)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(8)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 

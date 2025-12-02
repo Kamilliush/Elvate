@@ -192,7 +192,9 @@ struct WorkoutView: View {
                     let plan = ex.plan.map { SetPlan(reps: $0.reps, weight: $0.weight) }
                     return ExerciseInRoutine(exercise: exModel, plan: plan, restSeconds: ex.restSeconds)
                 }
-                return Routine(dbId: db.id, name: db.name, items: items, dateCreated: db.dateCreated)
+                var r = Routine(dbId: db.id, name: db.name, items: items, dateCreated: db.dateCreated)
+                r.iconName = db.iconName ?? "figure.strengthtraining.traditional"
+                return r
             }
             routineStore.routines = uiRoutines
         } catch {
@@ -214,7 +216,7 @@ private struct RoutineRow: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(Color.blue.opacity(0.12))
-                Image(systemName: "figure.strengthtraining.traditional")
+                Image(systemName: routine.iconName)
                     .foregroundStyle(.blue)
             }
             .frame(width: 44, height: 44)

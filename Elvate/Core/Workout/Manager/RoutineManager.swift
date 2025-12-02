@@ -19,6 +19,7 @@ struct DBRoutine: Codable, Identifiable {
     var name: String
     var dateCreated: Date
     var items: [DBRoutineExercise]
+    var iconName: String? // new, optional for backward compatibility
 }
 
 final class RoutineManager {
