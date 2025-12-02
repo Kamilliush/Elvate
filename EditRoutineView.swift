@@ -13,6 +13,11 @@ struct EditRoutineView: View {
     @State private var isSaving: Bool = false
     @State private var errorMessage: String? = nil
     
+    // Delete state
+    @State private var showDeleteConfirm: Bool = false
+    @State private var isDeleting: Bool = false
+    @State private var deleteErrorMessage: String? = nil
+    
     private let availableIcons: [String] = [
         "figure.strengthtraining.traditional",
         "dumbbell",
@@ -85,6 +90,29 @@ struct EditRoutineView: View {
                 if let errorMessage {
                     Section { Text(errorMessage).foregroundStyle(.red) }
                 }
+                
+                // Sekcja usuwania – NA SAMYM DOLE
+                Section {
+                    Button(role: .destructive) {
+                        showDeleteConfirm = true
+                    } label: {
+                        HStack {
+                            Spacer()
+                            if isDeleting {
+                                ProgressView()
+                                    .tint(.red)
+                            } else {
+                                Label("Usuń rutynę", systemImage: "trash")
+                            }
+                            Spacer()
+                        }
+                    }
+                    .disabled(isDeleting)
+                } footer: {
+                    if let deleteErrorMessage {
+                        Text(deleteErrorMessage).foregroundStyle(.red)
+                    }
+                }
             }
             .navigationTitle("Edytuj rutynę")
             .toolbar {
@@ -99,6 +127,18 @@ struct EditRoutineView: View {
                     }
                     .disabled(isSaving || items.isEmpty)
                 }
+            }
+            .confirmationDialog(
+                "Usunąć „\(routine.name)”?",
+                isPresented: $showDeleteConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("Usuń", role: .destructive) {
+                    Task { await deleteRoutine() }
+                }
+                Button("Anuluj", role: .cancel) { }
+            } message: {
+                Text("Tej operacji nie można cofnąć.")
             }
         }
     }
@@ -142,6 +182,40 @@ struct EditRoutineView: View {
             dismiss()
         } catch {
             errorMessage = "Nie udało się zaktualizować rutyny: \(error.localizedDescription)"
+        }
+    }
+    
+    private func deleteRoutine() async {
+        deleteErrorMessage = nil
+        isDeleting = true
+        defer { isDeleting = false }
+        
+        // Jeśli brak dbId, usuwamy tylko lokalnie
+        guard let dbId = routine.dbId else {
+            await MainActor.run {
+                routineStore.routines.removeAll { $0.id == routine.id }
+                dismiss()
+            }
+            return
+        }
+        
+        guard let auth = try? AuthenticationManager.shared.getAuthenticatedUser() else {
+            await MainActor.run {
+                deleteErrorMessage = "Brak zalogowanego użytkownika."
+            }
+            return
+        }
+        
+        do {
+            try await RoutineManager.shared.deleteRoutine(userId: auth.uid, routineId: dbId)
+            await MainActor.run {
+                routineStore.remove(byDbId: dbId)
+                dismiss()
+            }
+        } catch {
+            await MainActor.run {
+                deleteErrorMessage = "Nie udało się usunąć rutyny: \(error.localizedDescription)"
+            }
         }
     }
     

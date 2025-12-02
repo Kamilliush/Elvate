@@ -17,6 +17,12 @@ struct WorkoutView: View {
     @State private var editTarget: Routine? = nil
     @State private var showEditSheet: Bool = false
     
+    // Deletion
+    @State private var deleteTarget: Routine? = nil
+    @State private var showDeleteConfirm: Bool = false
+    @State private var deleteErrorMessage: String? = nil
+    @State private var isDeleting: Bool = false
+    
     var body: some View {
         NavigationStack(path: $path) {
             ScrollView {
@@ -121,6 +127,31 @@ struct WorkoutView: View {
                                         } label: {
                                             Label("Edit", systemImage: "pencil")
                                         }
+                                        Button(role: .destructive) {
+                                            deleteTarget = routine
+                                            showDeleteConfirm = true
+                                        } label: {
+                                            Label("Delete", systemImage: "trash")
+                                        }
+                                    }
+                                    // Swipe-to-edit (przesunięcie w prawo – leading)
+                                    .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                                        Button {
+                                            editTarget = routine
+                                            showEditSheet = true
+                                        } label: {
+                                            Label("Edit", systemImage: "pencil")
+                                        }
+                                        .tint(.blue)
+                                    }
+                                    // Swipe-to-delete (przesunięcie w lewo – trailing)
+                                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                        Button(role: .destructive) {
+                                            deleteTarget = routine
+                                            showDeleteConfirm = true
+                                        } label: {
+                                            Label("Delete", systemImage: "trash")
+                                        }
                                     }
                                 }
                             }
@@ -151,7 +182,37 @@ struct WorkoutView: View {
                     }
                 }
             }
+            // ZAMIANA: confirmationDialog -> alert (prostokątny systemowy)
+            .alert(deleteConfirmationTitle, isPresented: $showDeleteConfirm) {
+                Button("Delete", role: .destructive) {
+                    Task { await performDelete() }
+                }
+                Button("Cancel", role: .cancel) {
+                    // tylko zamknij
+                }
+            } message: {
+                if let deleteTarget {
+                    Text("Are you sure you want to delete “\(deleteTarget.name)”? This action cannot be undone.")
+                } else {
+                    Text("Are you sure you want to delete this routine? This action cannot be undone.")
+                }
+            }
+            .alert("Delete failed", isPresented: Binding(
+                get: { deleteErrorMessage != nil },
+                set: { if !$0 { deleteErrorMessage = nil } }
+            )) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(deleteErrorMessage ?? "")
+            }
         }
+    }
+    
+    private var deleteConfirmationTitle: String {
+        if let t = deleteTarget {
+            return "Delete “\(t.name)”?"
+        }
+        return "Delete routine?"
     }
     
     // MARK: - In-progress flag
@@ -199,6 +260,43 @@ struct WorkoutView: View {
             routineStore.routines = uiRoutines
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+    
+    // MARK: - Delete
+    
+    private func performDelete() async {
+        guard let target = deleteTarget else { return }
+        deleteErrorMessage = nil
+        
+        // Jeśli brak dbId -> usuwamy tylko lokalnie
+        guard let dbId = target.dbId else {
+            await MainActor.run {
+                routineStore.routines.removeAll { $0.id == target.id }
+                showDeleteConfirm = false
+                deleteTarget = nil
+            }
+            return
+        }
+        
+        guard let auth = try? AuthenticationManager.shared.getAuthenticatedUser() else {
+            await MainActor.run {
+                deleteErrorMessage = "User no logged in"
+            }
+            return
+        }
+        
+        do {
+            try await RoutineManager.shared.deleteRoutine(userId: auth.uid, routineId: dbId)
+            await MainActor.run {
+                routineStore.remove(byDbId: dbId)
+                showDeleteConfirm = false
+                deleteTarget = nil
+            }
+        } catch {
+            await MainActor.run {
+                deleteErrorMessage = "Failed to delete routine: \(error.localizedDescription)"
+            }
         }
     }
 }

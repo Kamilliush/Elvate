@@ -224,13 +224,6 @@ private struct ExerciseCard: View {
         VStack(alignment: .leading, spacing: 14) {
             // Nagłówek ćwiczenia
             HStack(spacing: 10) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Color.blue.opacity(0.12))
-                    Image(systemName: "figure.strengthtraining.traditional")
-                        .foregroundStyle(.blue)
-                }
-                .frame(width: 36, height: 36)
                 
                 Text(item.exercise.name)
                     .font(.headline)
