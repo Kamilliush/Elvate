@@ -128,6 +128,15 @@ struct ProfileView: View {
                     Text("No weight data")
                         .foregroundStyle(.secondary)
                 } else {
+                    let values = viewModel.weightHistory.map { $0.value }
+                    let minVal = values.min() ?? 0
+                    let maxVal = values.max() ?? 0
+                    let span = max(maxVal - minVal, 0)
+                    // Margines: 10% rozpiętości lub minimum 0.5 kg
+                    let padding = max(span * 0.1, 0.5)
+                    let lower = (span == 0) ? (minVal - 0.5) : (minVal - padding)
+                    let upper = (span == 0) ? (maxVal + 0.5) : (maxVal + padding)
+                    
                     Chart {
                         ForEach(viewModel.weightHistory, id: \.id) { e in
                             LineMark(
@@ -140,6 +149,7 @@ struct ProfileView: View {
                             )
                         }
                     }
+                    .chartYScale(domain: lower...upper)
                     .frame(height: 220)
                   
                 }
@@ -230,3 +240,4 @@ struct ProfileView_Previews: PreviewProvider {
         RootView()
     }
 }
+

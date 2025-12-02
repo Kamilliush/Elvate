@@ -40,6 +40,16 @@ enum MeasurementMetric: CaseIterable, Identifiable {
     }
 }
 
+enum MeasurementsRange: String, CaseIterable, Identifiable {
+    case all = "All"
+    case year = "Year"
+    case month = "Month"
+    case week = "Week"
+    case custom = "Custom"
+    
+    var id: String { rawValue }
+}
+
 @MainActor
 final class MeasurementDetailViewModel: ObservableObject {
     @Published var inputText: String = ""
@@ -48,6 +58,11 @@ final class MeasurementDetailViewModel: ObservableObject {
     @Published var isSaving: Bool = false
     @Published var errorMessage: String? = nil
     
+    // Zakres danych
+    @Published var selectedRange: MeasurementsRange = .all
+    @Published var customFrom: Date = Calendar.current.date(byAdding: .month, value: -1, to: Date()) ?? Date()
+    @Published var customTo: Date = Date()
+    
     let metric: MeasurementMetric
     
     init(metric: MeasurementMetric) {
@@ -55,6 +70,10 @@ final class MeasurementDetailViewModel: ObservableObject {
     }
     
     func load() async {
+        await loadWithCurrentRange()
+    }
+    
+    func loadWithCurrentRange() async {
         errorMessage = nil
         isLoading = true
         defer { isLoading = false }
@@ -65,10 +84,21 @@ final class MeasurementDetailViewModel: ObservableObject {
         }
         
         do {
-            let items = try await MeasurementsManager.shared.fetchMetricEntries(
-                userId: auth.uid,
-                metricId: metric.metricId
-            )
+            let (from, to) = dateBounds(for: selectedRange)
+            let items: [DBMetricEntry]
+            if selectedRange == .all {
+                items = try await MeasurementsManager.shared.fetchMetricEntries(
+                    userId: auth.uid,
+                    metricId: metric.metricId
+                )
+            } else {
+                items = try await MeasurementsManager.shared.fetchMetricEntries(
+                    userId: auth.uid,
+                    metricId: metric.metricId,
+                    from: from,
+                    to: to
+                )
+            }
             history = items
             if let last = history.last {
                 inputText = String(format: "%.1f", last.value)
@@ -102,7 +132,7 @@ final class MeasurementDetailViewModel: ObservableObject {
                 metricId: metric.metricId,
                 value: newValue
             )
-            await load()
+            await loadWithCurrentRange()
         } catch {
             errorMessage = "Cannot save \(error.localizedDescription)"
         }
@@ -122,6 +152,55 @@ final class MeasurementDetailViewModel: ObservableObject {
                 errorMessage = "Cannot delete: \(error.localizedDescription)"
             }
         }
-        await load()
+        await loadWithCurrentRange()
+    }
+    
+    // Edycja istniejącego wpisu (wartość, data bez zmian)
+    func updateEntry(id: String, newValueText: String) async {
+        errorMessage = nil
+        guard let auth = try? AuthenticationManager.shared.getAuthenticatedUser() else {
+            errorMessage = "User no logged in."
+            return
+        }
+        guard let newValue = parseDouble(newValueText) else {
+            errorMessage = "Type correct number value."
+            return
+        }
+        do {
+            try await MeasurementsManager.shared.updateMetricEntry(
+                userId: auth.uid,
+                metricId: metric.metricId,
+                documentId: id,
+                newValue: newValue
+            )
+            await loadWithCurrentRange()
+        } catch {
+            errorMessage = "Cannot update: \(error.localizedDescription)"
+        }
+    }
+    
+    // Wylicz granice dat dla zakresu
+    private func dateBounds(for range: MeasurementsRange) -> (Date?, Date?) {
+        let now = Date()
+        let cal = Calendar.current
+        switch range {
+        case .all:
+            return (nil, nil)
+        case .year:
+            let from = cal.date(byAdding: .day, value: -365, to: now)
+            return (from, now)
+        case .month:
+            let from = cal.date(byAdding: .day, value: -30, to: now)
+            return (from, now)
+        case .week:
+            let from = cal.date(byAdding: .day, value: -7, to: now)
+            return (from, now)
+        case .custom:
+            // Normalizujemy do początku/końca dnia aby inclusive działało intuicyjnie
+            let start = cal.startOfDay(for: customFrom)
+            let end = cal.date(bySettingHour: 23, minute: 59, second: 59, of: customTo) ?? customTo
+            return (start, end)
+        }
     }
 }
+

@@ -43,6 +43,7 @@ final class MeasurementsManager {
         try entriesCollection(userId: userId, metricId: metricId).addDocument(from: entry)
     }
     
+    // Oryginalna metoda (bez zakresu)
     func fetchMetricEntries(userId: String, metricId: String, limit: Int? = nil) async throws -> [DBMetricEntry] {
         var query: Query = entriesCollection(userId: userId, metricId: metricId)
             .order(by: DBMetricEntry.CodingKeys.dateCreated.rawValue, descending: false)
@@ -56,7 +57,36 @@ final class MeasurementsManager {
         }
     }
     
+    // Nowa metoda: pobieranie z zakresem dat (inclusive)
+    func fetchMetricEntries(userId: String, metricId: String, from: Date?, to: Date?) async throws -> [DBMetricEntry] {
+        var query: Query = entriesCollection(userId: userId, metricId: metricId)
+        
+        if let from {
+            query = query.whereField(DBMetricEntry.CodingKeys.dateCreated.rawValue, isGreaterThanOrEqualTo: from)
+        }
+        if let to {
+            query = query.whereField(DBMetricEntry.CodingKeys.dateCreated.rawValue, isLessThanOrEqualTo: to)
+        }
+        query = query.order(by: DBMetricEntry.CodingKeys.dateCreated.rawValue, descending: false)
+        
+        let snapshot = try await query.getDocuments()
+        return try snapshot.documents.map { doc in
+            var e = try doc.data(as: DBMetricEntry.self)
+            e.id = doc.documentID
+            return e
+        }
+    }
+    
+    // Nowa metoda: aktualizacja wartości istniejącego wpisu (data pozostaje bez zmian)
+    func updateMetricEntry(userId: String, metricId: String, documentId: String, newValue: Double) async throws {
+        let doc = entriesCollection(userId: userId, metricId: metricId).document(documentId)
+        try await doc.updateData([
+            DBMetricEntry.CodingKeys.value.rawValue: newValue
+        ])
+    }
+    
     func deleteMetricEntry(userId: String, metricId: String, documentId: String) async throws {
         try await entriesCollection(userId: userId, metricId: metricId).document(documentId).delete()
     }
 }
+
