@@ -88,6 +88,11 @@ struct ProfileView: View {
     
     @StateObject private var viewModel = ProfileViewModel()
     @Binding var showSignInView: Bool
+    @EnvironmentObject private var routineStore: RoutineStore
+    
+    // Prosty stan błędu/usuwania
+    @State private var deleteErrorMessage: String? = nil
+    @State private var deletingIds: Set<String> = []
     
     let preferenceOptions: [String] = ["Sports", "Movies", "Books"]
     
@@ -136,6 +141,14 @@ struct ProfileView: View {
         }
         .navigationTitle("Profile")
         .navigationBarTitleDisplayMode(.inline)
+        .alert("Nie udało się usunąć treningu", isPresented: Binding(
+            get: { deleteErrorMessage != nil },
+            set: { if !$0 { deleteErrorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(deleteErrorMessage ?? "")
+        }
     }
     
     // MARK: - Sections
@@ -396,6 +409,14 @@ struct ProfileView: View {
                         } label: {
                             workoutRow(w)
                         }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                Task { await deleteCompleted(workout: w) }
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                            .disabled(deletingIds.contains(w.id ?? ""))
+                        }
                     }
                 }
             }
@@ -410,7 +431,14 @@ struct ProfileView: View {
     }
     
     private func workoutRow(_ w: DBCompletedWorkout) -> some View {
-        let icon = w.routineIconName ?? "figure.strengthtraining.traditional"
+        // Priorytet: aktualna ikona z RoutineStore po routineId
+        let liveIconName: String? = {
+            if let rid = w.routineId, let r = routineStore.routines.first(where: { $0.dbId == rid }) {
+                return r.iconName
+            }
+            return nil
+        }()
+        let icon = liveIconName ?? w.routineIconName ?? "figure.strengthtraining.traditional"
         let tint = iconTint(for: icon)
         return HStack(alignment: .center, spacing: 12) {
             ZStack {
@@ -451,9 +479,9 @@ struct ProfileView: View {
             }
             HStack(spacing: 12) {
                 NavigationLink {
-                    MeasurementsView()
+                    MeasurementDetailView(metric: .biceps)
                 } label: {
-                    quickActionButton(title: "Measurements", icon: "ruler", tint: .blue)
+                    quickActionButton(title: "Add biceps size", icon: "ruler", tint: .blue)
                 }
                 
                 NavigationLink {
@@ -503,12 +531,45 @@ struct ProfileView: View {
         let s = seconds % 60
         return String(format: "%02d:%02d", m, s)
     }
+    
+    // MARK: - Delete action
+    
+    private func deleteCompleted(workout: DBCompletedWorkout) async {
+        guard let docId = workout.id else {
+            deleteErrorMessage = "Brak identyfikatora dokumentu."
+            return
+        }
+        guard let auth = try? AuthenticationManager.shared.getAuthenticatedUser() else {
+            deleteErrorMessage = "Brak zalogowanego użytkownika."
+            return
+        }
+        await MainActor.run {
+            deletingIds.insert(docId)
+        }
+        defer {
+            Task { @MainActor in
+                deletingIds.remove(docId)
+            }
+        }
+        do {
+            try await CompletedWorkoutsManager.shared.deleteCompletedWorkout(userId: auth.uid, documentId: docId)
+            await MainActor.run {
+                viewModel.completed.removeAll { $0.id == docId }
+            }
+        } catch {
+            await MainActor.run {
+                deleteErrorMessage = "Nie udało się usunąć: \(error.localizedDescription)"
+            }
+        }
+    }
 }
 
 struct ProfileView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
             ProfileView(showSignInView: .constant(false))
+                .environmentObject(RoutineStore())
         }
     }
 }
+

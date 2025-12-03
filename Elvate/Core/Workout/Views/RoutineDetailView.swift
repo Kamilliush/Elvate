@@ -331,9 +331,9 @@ struct RoutineDetailView: View {
         }
         
         let completed = DBCompletedWorkout(
-            routineId: nil,
+            routineId: currentRoutine.dbId, // <- WAŻNE: zapisujemy powiązanie z rutyną
             routineName: currentRoutine.name,
-            routineIconName: currentRoutine.iconName, // ZAPISZ IKONĘ RUTYNY
+            routineIconName: currentRoutine.iconName, // zostawiamy dla kompatybilności/fallbacku
             dateCompleted: Date(),
             durationSeconds: workoutElapsedSeconds,
             exercises: completedExercises
@@ -540,3 +540,4 @@ private extension RoutineDetailView {
         states[idx].restRemaining = 0
     }
 }
+
