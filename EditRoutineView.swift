@@ -91,34 +91,14 @@ struct EditRoutineView: View {
                     Section { Text(errorMessage).foregroundStyle(.red) }
                 }
                 
-                // Sekcja usuwania – NA SAMYM DOLE
-                Section {
-                    Button(role: .destructive) {
-                        showDeleteConfirm = true
-                    } label: {
-                        HStack {
-                            Spacer()
-                            if isDeleting {
-                                ProgressView()
-                                    .tint(.red)
-                            } else {
-                                Label("Usuń rutynę", systemImage: "trash")
-                            }
-                            Spacer()
-                        }
-                    }
-                    .disabled(isDeleting)
-                } footer: {
-                    if let deleteErrorMessage {
-                        Text(deleteErrorMessage).foregroundStyle(.red)
-                    }
-                }
+                
             }
             .navigationTitle("Edytuj rutynę")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Anuluj") { dismiss() }
                 }
+                
                 ToolbarItem(placement: .confirmationAction) {
                     Button {
                         Task { await saveChanges() }
@@ -127,19 +107,31 @@ struct EditRoutineView: View {
                     }
                     .disabled(isSaving || items.isEmpty)
                 }
+                
+                // 🔥 PRZYCISK USUWANIA — identyczny jak CompletedWorkoutDetailView
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(role: .destructive) {
+                        showDeleteConfirm = true
+                    } label: {
+                        Label("Usuń", systemImage: "trash")
+                    }
+                    .disabled(isDeleting || routine.dbId == nil)
+                }
             }
-            .confirmationDialog(
-                "Usunąć „\(routine.name)”?",
-                isPresented: $showDeleteConfirm,
-                titleVisibility: .visible
-            ) {
+            
+            .alert("Usunąć rutynę „\(routine.name)”?",
+                   isPresented: $showDeleteConfirm) {
+                
+                Button("Anuluj", role: .cancel) {}
+                
                 Button("Usuń", role: .destructive) {
                     Task { await deleteRoutine() }
                 }
-                Button("Anuluj", role: .cancel) { }
             } message: {
                 Text("Tej operacji nie można cofnąć.")
             }
+
+            
         }
     }
     
@@ -190,7 +182,6 @@ struct EditRoutineView: View {
         isDeleting = true
         defer { isDeleting = false }
         
-        // Jeśli brak dbId, usuwamy tylko lokalnie
         guard let dbId = routine.dbId else {
             await MainActor.run {
                 routineStore.routines.removeAll { $0.id == routine.id }
@@ -208,16 +199,19 @@ struct EditRoutineView: View {
         
         do {
             try await RoutineManager.shared.deleteRoutine(userId: auth.uid, routineId: dbId)
+            
             await MainActor.run {
                 routineStore.remove(byDbId: dbId)
-                dismiss()
+                dismiss()   // 🔥 NAVIGATION POP
             }
+            
         } catch {
             await MainActor.run {
                 deleteErrorMessage = "Nie udało się usunąć rutyny: \(error.localizedDescription)"
             }
         }
     }
+
     
     // MARK: - Helpers (kopie z PersonalizeRoutineView)
     
