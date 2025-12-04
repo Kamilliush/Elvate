@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		BA1E69E92EE2190500D8E1CB /* MeasurementEntryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA1E69E82EE2190500D8E1CB /* MeasurementEntryDetailView.swift */; };
 		BA3405E12ED7D0EF001A0B98 /* EditRoutineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA3405E02ED7D0EF001A0B98 /* EditRoutineView.swift */; };
 		BA420B3A2EB611B800B7596C /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = BA420B392EB611B800B7596C /* FirebaseAnalytics */; };
 		BA420B3D2EB619D900B7596C /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = BA420B3C2EB619D900B7596C /* FirebaseAuth */; };
@@ -16,6 +17,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		BA1E69E82EE2190500D8E1CB /* MeasurementEntryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeasurementEntryDetailView.swift; sourceTree = "<group>"; };
 		BA3405E02ED7D0EF001A0B98 /* EditRoutineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditRoutineView.swift; sourceTree = "<group>"; };
 		BA420B1A2EB6097E00B7596C /* Elvate.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Elvate.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -64,6 +66,7 @@
 				BA420B3B2EB619D900B7596C /* Frameworks */,
 				BA420B1B2EB6097E00B7596C /* Products */,
 				BA3405E02ED7D0EF001A0B98 /* EditRoutineView.swift */,
+				BA1E69E82EE2190500D8E1CB /* MeasurementEntryDetailView.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -166,6 +169,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				BA3405E12ED7D0EF001A0B98 /* EditRoutineView.swift in Sources */,
+				BA1E69E92EE2190500D8E1CB /* MeasurementEntryDetailView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
