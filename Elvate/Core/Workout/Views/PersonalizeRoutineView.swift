@@ -13,6 +13,7 @@ struct PersonalizeRoutineView: View {
     @State private var errorMessage: String? = nil
     @State private var saveSuccess: Bool = false
     
+    // Icons to choose
     private let availableIcons: [String] = [
         "figure.strengthtraining.traditional",
         "dumbbell",
@@ -27,18 +28,25 @@ struct PersonalizeRoutineView: View {
     ]
     @State private var selectedIconName: String = "figure.strengthtraining.traditional"
     
+    // Alert when name missing
+    @State private var showNameRequiredAlert: Bool = false
+    
     init(exercises: [Exercise]) {
         self.exercises = exercises
+    }
+    
+    private var nameTrimmed: String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Routine name
+                // Routine name (required)
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Routine name")
                         .font(.headline)
-                    TextField("Push day", text: $name)
+                    TextField("Enter routine name", text: $name)
                         .textFieldStyle(.roundedBorder)
                 }
                 .padding()
@@ -79,9 +87,13 @@ struct PersonalizeRoutineView: View {
                         .padding(.horizontal, 4)
                 }
                 
-                // Save
+                // Save — show alert if name missing
                 Button {
-                    Task { await saveRoutine() }
+                    if nameTrimmed.isEmpty {
+                        showNameRequiredAlert = true
+                    } else {
+                        Task { await saveRoutine() }
+                    }
                 } label: {
                     HStack(spacing: 8) {
                         if isSaving { ProgressView().tint(.white) }
@@ -111,6 +123,11 @@ struct PersonalizeRoutineView: View {
                 }
             }
         }
+        .alert("Routine name is required.", isPresented: $showNameRequiredAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Please enter a name for your routine before saving.")
+        }
     }
     
     // MARK: - Save to Firestore
@@ -121,11 +138,16 @@ struct PersonalizeRoutineView: View {
         isSaving = true
         defer { isSaving = false }
         
+        // Double-check name
+        guard !nameTrimmed.isEmpty else {
+            errorMessage = "Routine name is required."
+            return
+        }
+        
         guard let auth = try? AuthenticationManager.shared.getAuthenticatedUser() else {
             errorMessage = "User not logged in."
             return
         }
-        let routineName = name.isEmpty ? defaultName() : name
         
         let dbItems: [DBRoutineExercise] = items.map { it in
             DBRoutineExercise(
@@ -137,7 +159,7 @@ struct PersonalizeRoutineView: View {
         }
         let dbRoutine = DBRoutine(
             id: nil,
-            name: routineName,
+            name: nameTrimmed,
             dateCreated: Date(),
             items: dbItems,
             iconName: selectedIconName
@@ -145,7 +167,7 @@ struct PersonalizeRoutineView: View {
         
         do {
             try await RoutineManager.shared.addRoutine(userId: auth.uid, routine: dbRoutine)
-            var uiRoutine = Routine(name: routineName, items: items)
+            var uiRoutine = Routine(name: nameTrimmed, items: items)
             uiRoutine.iconName = selectedIconName
             routineStore.add(uiRoutine)
             saveSuccess = true
@@ -172,13 +194,6 @@ struct PersonalizeRoutineView: View {
         } else {
             return String(format: "%.1f", value)
         }
-    }
-    
-    private func defaultName() -> String {
-        if let first = exercises.first?.category {
-            return "\(first.capitalized) Routine"
-        }
-        return "New Routine"
     }
 }
 
