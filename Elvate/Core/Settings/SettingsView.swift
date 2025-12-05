@@ -17,6 +17,9 @@ struct SettingsView: View {
     @State private var showUpdateEmailPopup = false
     @State private var showUpdatePasswordPopup = false
     
+    // NOWE: potwierdzenie resetu hasła
+    @State private var showResetConfirm = false
+    
     // dane do popupów
     @State private var newEmail = ""
     @State private var currentEmailPassword = ""
@@ -108,6 +111,23 @@ struct SettingsView: View {
         } message: {
             Text("Enter your current and new password to update your credentials.")
         }
+        
+        // NOWE: Potwierdzenie wysłania maila z resetem hasła
+        .alert("Send password reset link?", isPresented: $showResetConfirm) {
+            Button("Cancel", role: .cancel) {}
+            Button("Send") {
+                Task {
+                    do {
+                        try await viewModel.resetPassword()
+                        print("Password reset email sent.")
+                    } catch {
+                        print("Reset error:", error.localizedDescription)
+                    }
+                }
+            }
+        } message: {
+            Text("We will email you a link to reset your password.")
+        }
     }
     
     // MARK: - Cards
@@ -160,14 +180,8 @@ struct SettingsView: View {
             
             VStack(spacing: 10) {
                 Button {
-                    Task {
-                        do {
-                            try await viewModel.resetPassword()
-                            print("Password reset email sent.")
-                        } catch {
-                            print("Reset error:", error.localizedDescription)
-                        }
-                    }
+                    // Zamiast od razu wysyłać – pokaż potwierdzenie
+                    showResetConfirm = true
                 } label: {
                     rowButton(title: "Send password reset link", icon: "envelope.badge", tint: .orange)
                 }
