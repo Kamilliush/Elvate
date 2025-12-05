@@ -42,21 +42,21 @@ struct EditRoutineView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section(header: Text("Nazwa rutyny")) {
-                    TextField("Np. Push Day", text: $name)
+                Section(header: Text("Routine name")) {
+                    TextField("e.g. Push Day", text: $name)
                 }
                 
-                Section(header: Text("Ikona rutyny")) {
+                Section(header: Text("Routine icon")) {
                     IconGridInline(icons: availableIcons, selected: $iconName)
                 }
                 
-                Section(header: Text("Parametry ćwiczeń")) {
+                Section(header: Text("Exercise parameters")) {
                     ForEach($items) { $item in
                         VStack(alignment: .leading, spacing: 8) {
                             Text(item.exercise.name)
                                 .font(.headline)
                             
-                            Stepper("Liczba serii: \(item.plan.count)", value: Binding(
+                            Stepper("Number of sets: \(item.plan.count)", value: Binding(
                                 get: { item.plan.count },
                                 set: { newCount in
                                     adjustPlanCount(for: &item.plan, to: newCount)
@@ -65,14 +65,14 @@ struct EditRoutineView: View {
                             
                             ForEach($item.plan) { $setPlan in
                                 VStack(alignment: .leading, spacing: 6) {
-                                    Text("Seria \(seriesIndex(in: item.plan, id: setPlan.id) + 1)")
+                                    Text("Set \(seriesIndex(in: item.plan, id: setPlan.id) + 1)")
                                         .font(.subheadline.bold())
                                     
                                     HStack {
-                                        Stepper("Powtórzenia: \(setPlan.reps)", value: $setPlan.reps, in: 1...50)
+                                        Stepper("Reps: \(setPlan.reps)", value: $setPlan.reps, in: 1...50)
                                     }
                                     HStack {
-                                        Stepper("Ciężar: \(formattedWeight(setPlan.weight)) kg",
+                                        Stepper("Weight: \(formattedWeight(setPlan.weight)) kg",
                                                 value: $setPlan.weight,
                                                 in: 0...500,
                                                 step: 2.5)
@@ -81,7 +81,7 @@ struct EditRoutineView: View {
                                 .padding(.vertical, 4)
                             }
                             
-                            Stepper("Przerwa: \(item.restSeconds) s", value: $item.restSeconds, in: 15...600, step: 15)
+                            Stepper("Rest: \(item.restSeconds) s", value: $item.restSeconds, in: 15...600, step: 15)
                         }
                         .padding(.vertical, 6)
                     }
@@ -90,48 +90,44 @@ struct EditRoutineView: View {
                 if let errorMessage {
                     Section { Text(errorMessage).foregroundStyle(.red) }
                 }
-                
-                
             }
-            .navigationTitle("Edytuj rutynę")
+            .navigationTitle("Edit routine")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Anuluj") { dismiss() }
+                    Button("Cancel") { dismiss() }
                 }
                 
                 ToolbarItem(placement: .confirmationAction) {
                     Button {
                         Task { await saveChanges() }
                     } label: {
-                        if isSaving { ProgressView() } else { Text("Zapisz") }
+                        if isSaving { ProgressView() } else { Text("Save") }
                     }
                     .disabled(isSaving || items.isEmpty)
                 }
                 
-                // 🔥 PRZYCISK USUWANIA — identyczny jak CompletedWorkoutDetailView
+                // Delete
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(role: .destructive) {
                         showDeleteConfirm = true
                     } label: {
-                        Label("Usuń", systemImage: "trash")
+                        Label("Delete", systemImage: "trash")
                     }
                     .disabled(isDeleting || routine.dbId == nil)
                 }
             }
             
-            .alert("Usunąć rutynę „\(routine.name)”?",
+            .alert("Delete routine “\(routine.name)”?",
                    isPresented: $showDeleteConfirm) {
                 
-                Button("Anuluj", role: .cancel) {}
+                Button("Cancel", role: .cancel) {}
                 
-                Button("Usuń", role: .destructive) {
+                Button("Delete", role: .destructive) {
                     Task { await deleteRoutine() }
                 }
             } message: {
-                Text("Tej operacji nie można cofnąć.")
+                Text("This action cannot be undone.")
             }
-
-            
         }
     }
     
@@ -141,11 +137,11 @@ struct EditRoutineView: View {
         defer { isSaving = false }
         
         guard let auth = try? AuthenticationManager.shared.getAuthenticatedUser() else {
-            errorMessage = "Brak zalogowanego użytkownika."
+            errorMessage = "User not logged in."
             return
         }
         guard let docId = routine.dbId else {
-            errorMessage = "Brak identyfikatora rutyny."
+            errorMessage = "Missing routine id."
             return
         }
         
@@ -167,13 +163,12 @@ struct EditRoutineView: View {
         
         do {
             try await RoutineManager.shared.updateRoutine(userId: auth.uid, routineId: docId, routine: dbRoutine)
-            // update local store model
             var updated = Routine(dbId: docId, name: dbRoutine.name, items: items, dateCreated: dbRoutine.dateCreated)
             updated.iconName = iconName
             onSaved(updated)
             dismiss()
         } catch {
-            errorMessage = "Nie udało się zaktualizować rutyny: \(error.localizedDescription)"
+            errorMessage = "Failed to update routine: \(error.localizedDescription)"
         }
     }
     
@@ -192,28 +187,25 @@ struct EditRoutineView: View {
         
         guard let auth = try? AuthenticationManager.shared.getAuthenticatedUser() else {
             await MainActor.run {
-                deleteErrorMessage = "Brak zalogowanego użytkownika."
+                deleteErrorMessage = "User not logged in."
             }
             return
         }
         
         do {
             try await RoutineManager.shared.deleteRoutine(userId: auth.uid, routineId: dbId)
-            
             await MainActor.run {
                 routineStore.remove(byDbId: dbId)
-                dismiss()   // 🔥 NAVIGATION POP
+                dismiss()
             }
-            
         } catch {
             await MainActor.run {
-                deleteErrorMessage = "Nie udało się usunąć rutyny: \(error.localizedDescription)"
+                deleteErrorMessage = "Failed to delete routine: \(error.localizedDescription)"
             }
         }
     }
 
-    
-    // MARK: - Helpers (kopie z PersonalizeRoutineView)
+    // MARK: - Helpers
     
     private func adjustPlanCount(for plan: inout [SetPlan], to newCount: Int) {
         let current = plan.count
@@ -271,3 +263,4 @@ private struct IconGridInline: View {
         .padding(.vertical, 6)
     }
 }
+

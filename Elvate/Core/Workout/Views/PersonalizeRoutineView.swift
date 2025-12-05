@@ -13,7 +13,6 @@ struct PersonalizeRoutineView: View {
     @State private var errorMessage: String? = nil
     @State private var saveSuccess: Bool = false
     
-    // Ikony do wyboru
     private let availableIcons: [String] = [
         "figure.strengthtraining.traditional",
         "dumbbell",
@@ -35,7 +34,7 @@ struct PersonalizeRoutineView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Nazwa rutyny
+                // Routine name
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Routine name")
                         .font(.headline)
@@ -45,7 +44,7 @@ struct PersonalizeRoutineView: View {
                 .padding()
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 
-                // Wybór ikony
+                // Icon selection
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Choose icon")
                         .font(.headline)
@@ -55,7 +54,7 @@ struct PersonalizeRoutineView: View {
                     IconGrid(icons: availableIcons, selected: $selectedIconName)
                 }
                 
-                // Ćwiczenia i parametry
+                // Exercises and parameters
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Personalize exercises")
                         .font(.headline)
@@ -80,7 +79,7 @@ struct PersonalizeRoutineView: View {
                         .padding(.horizontal, 4)
                 }
                 
-                // Zapisz
+                // Save
                 Button {
                     Task { await saveRoutine() }
                 } label: {
@@ -100,7 +99,7 @@ struct PersonalizeRoutineView: View {
             }
             .padding(20)
         }
-        .navigationTitle("Personlalize")
+        .navigationTitle("Personalize")
         .onAppear {
             if items.isEmpty {
                 items = exercises.map { ex in
@@ -123,7 +122,7 @@ struct PersonalizeRoutineView: View {
         defer { isSaving = false }
         
         guard let auth = try? AuthenticationManager.shared.getAuthenticatedUser() else {
-            errorMessage = "User no logged in."
+            errorMessage = "User not logged in."
             return
         }
         let routineName = name.isEmpty ? defaultName() : name
@@ -146,7 +145,6 @@ struct PersonalizeRoutineView: View {
         
         do {
             try await RoutineManager.shared.addRoutine(userId: auth.uid, routine: dbRoutine)
-            // Aktualizuj lokalny store, aby UI od razu widziało
             var uiRoutine = Routine(name: routineName, items: items)
             uiRoutine.iconName = selectedIconName
             routineStore.add(uiRoutine)
@@ -222,15 +220,14 @@ private struct ExerciseCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            // Nagłówek ćwiczenia
+            // Header
             HStack(spacing: 10) {
-                
                 Text(item.exercise.name)
                     .font(.headline)
                 Spacer()
             }
             
-            // Liczba serii
+            // Sets count
             HStack(spacing: 10) {
                 Image(systemName: "square.stack.3d.up")
                     .foregroundStyle(.secondary)
@@ -242,7 +239,7 @@ private struct ExerciseCard: View {
                 ), in: 1...10)
             }
             
-            // Seria x: reps + ciężar
+            // Per-set parameters
             VStack(spacing: 10) {
                 ForEach($item.plan) { $setPlan in
                     VStack(alignment: .leading, spacing: 8) {
@@ -269,11 +266,11 @@ private struct ExerciseCard: View {
                 }
             }
             
-            // Przerwa
+            // Rest timer
             HStack(spacing: 10) {
                 Image(systemName: "timer")
                     .foregroundStyle(.secondary)
-                Stepper("Rest timer: \(item.restSeconds) s", value: $item.restSeconds, in: 15...600, step: 15)
+                Stepper("Rest: \(item.restSeconds) s", value: $item.restSeconds, in: 15...600, step: 15)
             }
         }
         .padding(16)
@@ -281,7 +278,6 @@ private struct ExerciseCard: View {
         .shadow(color: .black.opacity(0.05), radius: 6, y: 3)
     }
     
-    // Helpers (lokalnie, by nie mieszać w logice widoku głównego)
     private func adjustPlanCount(for plan: inout [SetPlan], to newCount: Int) {
         let current = plan.count
         if newCount > current {
@@ -304,3 +300,4 @@ private struct ExerciseCard: View {
         }
     }
 }
+

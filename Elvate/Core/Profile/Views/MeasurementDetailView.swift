@@ -11,7 +11,7 @@ import Charts
 struct MeasurementDetailView: View {
     @StateObject private var viewModel: MeasurementDetailViewModel
     
-    // Edycja istniejącego wpisu (pozostawiamy poprzedni sheet jako opcję, ale przechodzimy na osobny ekran)
+    // Kept for backward compatibility (not used for navigation now)
     @State private var editSheetPresented = false
     @State private var editValueText: String = ""
     @State private var editingEntryId: String? = nil
@@ -24,7 +24,7 @@ struct MeasurementDetailView: View {
         ScrollView {
             VStack(spacing: 20) {
                 
-                // HEADER
+                // Header
                 VStack(alignment: .leading, spacing: 6) {
                     Text(viewModel.metric.title)
                         .font(.largeTitle.bold())
@@ -34,7 +34,7 @@ struct MeasurementDetailView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 
-                // RANGE CARD
+                // Range card
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Label("Range", systemImage: "calendar")
@@ -82,7 +82,7 @@ struct MeasurementDetailView: View {
                 )
                 .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
                 
-                // EDIT CARD
+                // Edit card
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Label("Add / Edit", systemImage: "square.and.pencil")
@@ -91,7 +91,7 @@ struct MeasurementDetailView: View {
                     }
                     
                     VStack(alignment: .leading, spacing: 12) {
-                        // INPUT FIELD
+                        // Input field
                         VStack(alignment: .leading, spacing: 6) {
                             Text(viewModel.metric.title)
                                 .font(.footnote.weight(.semibold))
@@ -151,7 +151,7 @@ struct MeasurementDetailView: View {
                 )
                 .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
                 
-                // HISTORY CARD
+                // History card
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Label("History", systemImage: "clock")
@@ -216,7 +216,6 @@ struct MeasurementDetailView: View {
         .task {
             await viewModel.load()
         }
-        // Stary sheet edycji pozostawiony, ale nieużywany (nawigujemy do osobnego ekranu)
         .sheet(isPresented: $editSheetPresented) {
             NavigationStack {
                 Form {
@@ -329,3 +328,4 @@ struct MeasurementDetailView: View {
         MeasurementDetailView(metric: .weight)
     }
 }
+

@@ -10,7 +10,7 @@ struct CompletedWorkoutDetailView: View {
     
     var body: some View {
         List {
-            Section(header: Text("Trening")) {
+            Section(header: Text("Training")) {
                 Text(workout.routineName)
                     .font(.headline)
                 HStack {
@@ -33,15 +33,13 @@ struct CompletedWorkoutDetailView: View {
                 Section(header: Text(ex.exerciseName)) {
                     ForEach(ex.sets.sorted(by: { $0.index < $1.index }), id: \.index) { s in
                         HStack {
-                            Text("Seria \(s.index + 1)")
+                            Text("Set \(s.index + 1)")
                             
                             Spacer()
                             
-                            // opis serii
-                            Text("\(s.reps) powt. • \(formattedWeight(s.weight)) kg")
+                            Text("\(s.reps) reps • \(formattedWeight(s.weight)) kg")
                                 .foregroundStyle(.secondary)
                             
-                            // status: wykonano / nie wykonano
                             Image(systemName: s.done ? "checkmark.circle.fill" : "xmark.circle.fill")
                                 .foregroundStyle(s.done ? .green : .red)
                         }
@@ -55,29 +53,29 @@ struct CompletedWorkoutDetailView: View {
                 Button(role: .destructive) {
                     showDeleteAlert = true
                 } label: {
-                    Label("Usuń", systemImage: "trash")
+                    Label("Delete", systemImage: "trash")
                 }
                 .disabled(isDeleting || workout.id == nil)
             }
         }
-        .alert("Usunąć ten zakończony trening?", isPresented: $showDeleteAlert) {
-            Button("Anuluj", role: .cancel) {}
-            Button("Usuń", role: .destructive) {
+        .alert("Delete this completed workout?", isPresented: $showDeleteAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
                 Task { await deleteWorkout() }
             }
         } message: {
-            Text("Tej operacji nie można cofnąć.")
+            Text("This action cannot be undone.")
         }
     }
     
     private func deleteWorkout() async {
         errorMessage = nil
         guard let docId = workout.id else {
-            errorMessage = "Brak identyfikatora dokumentu."
+            errorMessage = "Missing document id."
             return
         }
         guard let auth = try? AuthenticationManager.shared.getAuthenticatedUser() else {
-            errorMessage = "Brak zalogowanego użytkownika."
+            errorMessage = "User not logged in."
             return
         }
         isDeleting = true
@@ -90,7 +88,7 @@ struct CompletedWorkoutDetailView: View {
             }
         } catch {
             await MainActor.run {
-                errorMessage = "Nie udało się usunąć: \(error.localizedDescription)"
+                errorMessage = "Failed to delete: \(error.localizedDescription)"
             }
         }
     }
@@ -109,3 +107,4 @@ struct CompletedWorkoutDetailView: View {
         }
     }
 }
+

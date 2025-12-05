@@ -24,7 +24,7 @@ struct MeasurementEntryDetailView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // HEADER
+                // Header
                 VStack(alignment: .leading, spacing: 6) {
                     Text(metric.title)
                         .font(.largeTitle.bold())
@@ -34,7 +34,7 @@ struct MeasurementEntryDetailView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 
-                // DETAILS CARD
+                // Details card
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Label("Entry details", systemImage: "info.circle")
@@ -71,7 +71,7 @@ struct MeasurementEntryDetailView: View {
                 )
                 .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
                 
-                // EDIT CARD
+                // Edit card
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Label("Edit value", systemImage: "square.and.pencil")
@@ -181,7 +181,7 @@ struct MeasurementEntryDetailView: View {
         defer { isSaving = false }
         
         guard let auth = try? AuthenticationManager.shared.getAuthenticatedUser() else {
-            errorMessage = "User no logged in."
+            errorMessage = "User not logged in."
             return
         }
         guard let id = entry.id else {
@@ -190,7 +190,7 @@ struct MeasurementEntryDetailView: View {
         }
         let normalized = valueText.replacingOccurrences(of: ",", with: ".")
         guard let newValue = Double(normalized) else {
-            errorMessage = "Type correct number value."
+            errorMessage = "Type a correct numeric value."
             return
         }
         
@@ -214,7 +214,7 @@ struct MeasurementEntryDetailView: View {
         defer { isDeleting = false }
         
         guard let auth = try? AuthenticationManager.shared.getAuthenticatedUser() else {
-            errorMessage = "User no logged in."
+            errorMessage = "User not logged in."
             return
         }
         guard let id = entry.id else {
@@ -243,3 +243,4 @@ struct MeasurementEntryDetailView: View {
         )
     }
 }
+

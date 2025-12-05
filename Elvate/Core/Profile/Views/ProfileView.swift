@@ -15,7 +15,7 @@ final class ProfileViewModel: ObservableObject {
     @Published private(set) var user: DBUser? = nil
     @Published var completed: [DBCompletedWorkout] = []
     
-    // Historia wagi do wykresu
+    // Weight history for chart
     @Published var weightHistory: [DBMetricEntry] = []
     @Published var isLoadingWeight: Bool = false
     @Published var weightError: String? = nil
@@ -41,7 +41,7 @@ final class ProfileViewModel: ObservableObject {
         defer { isLoadingWeight = false }
         
         guard let auth = try? AuthenticationManager.shared.getAuthenticatedUser() else {
-            weightError = "Brak zalogowanego użytkownika."
+            weightError = "User not logged in."
             return
         }
         do {
@@ -51,7 +51,7 @@ final class ProfileViewModel: ObservableObject {
             )
             self.weightHistory = items
         } catch {
-            weightError = "Nie udało się pobrać historii wagi: \(error.localizedDescription)"
+            weightError = "Failed to load weight history: \(error.localizedDescription)"
         }
     }
     
@@ -90,7 +90,7 @@ struct ProfileView: View {
     @Binding var showSignInView: Bool
     @EnvironmentObject private var routineStore: RoutineStore
     
-    // Prosty stan błędu/usuwania
+    // Simple delete state
     @State private var deleteErrorMessage: String? = nil
     @State private var deletingIds: Set<String> = []
     
@@ -154,7 +154,7 @@ struct ProfileView: View {
         }
         .navigationTitle("Profile")
         .navigationBarTitleDisplayMode(.inline)
-        .alert("Nie udało się usunąć treningu", isPresented: Binding(
+        .alert("Failed to delete workout", isPresented: Binding(
             get: { deleteErrorMessage != nil },
             set: { if !$0 { deleteErrorMessage = nil } }
         )) {
@@ -260,7 +260,6 @@ struct ProfileView: View {
                         .background(.thinMaterial)
                         .clipShape(Capsule())
                 }
-                // Usunięto przycisk Enable/Disable Premium zgodnie z prośbą
             }
         }
         .padding(16)
@@ -493,6 +492,7 @@ struct ProfileView: View {
     }
     
     private func workoutRow(_ w: DBCompletedWorkout) -> some View {
+        // Try to use live icon from RoutineStore (by routineId)
         let liveIconName: String? = {
             if let rid = w.routineId, let r = routineStore.routines.first(where: { $0.dbId == rid }) {
                 return r.iconName
@@ -597,11 +597,11 @@ struct ProfileView: View {
     
     private func deleteCompleted(workout: DBCompletedWorkout) async {
         guard let docId = workout.id else {
-            deleteErrorMessage = "Brak identyfikatora dokumentu."
+            deleteErrorMessage = "Missing document id."
             return
         }
         guard let auth = try? AuthenticationManager.shared.getAuthenticatedUser() else {
-            deleteErrorMessage = "Brak zalogowanego użytkownika."
+            deleteErrorMessage = "User not logged in."
             return
         }
         await MainActor.run {
@@ -619,7 +619,7 @@ struct ProfileView: View {
             }
         } catch {
             await MainActor.run {
-                deleteErrorMessage = "Nie udało się usunąć: \(error.localizedDescription)"
+                deleteErrorMessage = "Failed to delete: \(error.localizedDescription)"
             }
         }
     }
@@ -630,14 +630,14 @@ struct ProfileView: View {
         nameError = nil
         let trimmed = displayNameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
         
-        // Walidacja: 2–24 znaki, bez pustej nazwy
+        // Validation: 2–24 chars
         guard trimmed.count >= 2, trimmed.count <= 24 else {
             nameError = "Name must be 2–24 characters."
             return
         }
         
         guard let auth = try? AuthenticationManager.shared.getAuthenticatedUser() else {
-            nameError = "User no logged in."
+            nameError = "User not logged in."
             return
         }
         isSavingName = true

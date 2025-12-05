@@ -27,7 +27,7 @@ struct WorkoutView: View {
         NavigationStack(path: $path) {
             ScrollView {
                 VStack(spacing: 20) {
-                    // Nagłówek
+                    // Header
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Workouts")
                             .font(.largeTitle.bold())
@@ -37,7 +37,7 @@ struct WorkoutView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     
-                    // Przycisk "New routine"
+                    // New routine button
                     NavigationLink {
                         ExercisesView(selectionMode: true) { selected in
                             path.append(NavDestination.personalize(selected))
@@ -62,7 +62,7 @@ struct WorkoutView: View {
                         .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
                     }
                     
-                    // Treść listy
+                    // List content
                     Group {
                         if isLoading {
                             VStack(spacing: 12) {
@@ -134,7 +134,6 @@ struct WorkoutView: View {
                                             Label("Delete", systemImage: "trash")
                                         }
                                     }
-                                    // Swipe-to-edit (przesunięcie w prawo – leading)
                                     .swipeActions(edge: .leading, allowsFullSwipe: false) {
                                         Button {
                                             editTarget = routine
@@ -144,7 +143,6 @@ struct WorkoutView: View {
                                         }
                                         .tint(.blue)
                                     }
-                                    // Swipe-to-delete (przesunięcie w lewo – trailing)
                                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                         Button(role: .destructive) {
                                             deleteTarget = routine
@@ -182,13 +180,11 @@ struct WorkoutView: View {
                     }
                 }
             }
-            // ZAMIANA: confirmationDialog -> alert (prostokątny systemowy)
             .alert(deleteConfirmationTitle, isPresented: $showDeleteConfirm) {
                 Button("Delete", role: .destructive) {
                     Task { await performDelete() }
                 }
                 Button("Cancel", role: .cancel) {
-                    // tylko zamknij
                 }
             } message: {
                 if let deleteTarget {
@@ -229,7 +225,7 @@ struct WorkoutView: View {
         defer { isLoading = false }
         
         guard let auth = try? AuthenticationManager.shared.getAuthenticatedUser() else {
-            errorMessage = "User no logged in"
+            errorMessage = "User not logged in."
             return
         }
         
@@ -269,7 +265,6 @@ struct WorkoutView: View {
         guard let target = deleteTarget else { return }
         deleteErrorMessage = nil
         
-        // Jeśli brak dbId -> usuwamy tylko lokalnie
         guard let dbId = target.dbId else {
             await MainActor.run {
                 routineStore.routines.removeAll { $0.id == target.id }
@@ -281,7 +276,7 @@ struct WorkoutView: View {
         
         guard let auth = try? AuthenticationManager.shared.getAuthenticatedUser() else {
             await MainActor.run {
-                deleteErrorMessage = "User no logged in"
+                deleteErrorMessage = "User not logged in."
             }
             return
         }
@@ -353,3 +348,4 @@ private struct RoutineRow: View {
     WorkoutView()
         .environmentObject(RoutineStore())
 }
+
