@@ -18,7 +18,7 @@ struct SignInEmailView: View {
         ScrollView {
             VStack(spacing: 20) {
                 
-                // HEADER
+               
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Email sign-in")
                         .font(.largeTitle.bold())
@@ -28,10 +28,8 @@ struct SignInEmailView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 
-                // FORM CARD
                 VStack(alignment: .leading, spacing: 14) {
                     
-                    // EMAIL FIELD
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Email")
                             .font(.footnote.weight(.semibold))
@@ -57,7 +55,6 @@ struct SignInEmailView: View {
                         )
                     }
                     
-                    // PASSWORD FIELD
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Password")
                             .font(.footnote.weight(.semibold))
@@ -109,7 +106,6 @@ struct SignInEmailView: View {
                         .padding(.top, 4)
                     }
                     
-                    // BUTTON
                     Button {
                         Task { await signInOrSignUp() }
                     } label: {

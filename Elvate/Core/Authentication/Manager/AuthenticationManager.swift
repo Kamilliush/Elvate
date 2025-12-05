@@ -42,8 +42,6 @@ final class AuthenticationManager {
             throw URLError(.badServerResponse)
         }
         
-        //google.com
-        //password
         var providers: [AuthProviderOption] = []
         for provider in providerData {
             if let option = AuthProviderOption(rawValue: provider.providerID) {
