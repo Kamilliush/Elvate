@@ -16,6 +16,7 @@ struct DBUser: Codable {
     let dateCreated: Date?
     let isPremium: Bool?
     let preferences: [String]?
+    let displayName: String?   // NEW
     
     init(auth: AuthDataResultModel) {
         self.userId = auth.uid
@@ -24,6 +25,12 @@ struct DBUser: Codable {
         self.dateCreated = Date()
         self.isPremium = false
         self.preferences = nil
+        // Domyślna nazwa z prefiksu emaila lub "User"
+        if let email = auth.email, let prefix = email.split(separator: "@").first, !prefix.isEmpty {
+            self.displayName = String(prefix).capitalized
+        } else {
+            self.displayName = "User"
+        }
     }
     
     init (
@@ -32,7 +39,8 @@ struct DBUser: Codable {
         photoUrl: String? = nil,
         dateCreated: Date? = nil,
         isPremium: Bool? = nil,
-        preferences: [String]? = nil
+        preferences: [String]? = nil,
+        displayName: String? = nil    // NEW
     ) {
         self.userId = userId
         self.email = email
@@ -40,22 +48,8 @@ struct DBUser: Codable {
         self.dateCreated = dateCreated
         self.isPremium = isPremium
         self.preferences = preferences
+        self.displayName = displayName
     }
-    
-//    func togglePremiumStatus() -> DBUser {
-//        let currentValue = isPremium ?? false
-//        return DBUser(
-//            userId: userId,
-//            email: email,
-//            photoUrl: photoUrl,
-//            dateCreated: dateCreated,
-//            isPremium: !currentValue)
-//    }
-    
-//    mutating func togglePremiumStatus() {
-//        let currentValue = isPremium ?? false
-//        isPremium = !currentValue
-//    }
     
     enum CodingKeys: String, CodingKey {
         case userId = "user_id"
@@ -64,6 +58,7 @@ struct DBUser: Codable {
         case dateCreated = "date_created"
         case isPremium = "user_isPremium"
         case preferences = "preferences"
+        case displayName = "display_name"   // NEW
     }
     
     init(from decoder: any Decoder) throws {
@@ -74,6 +69,7 @@ struct DBUser: Codable {
         self.dateCreated = try container.decodeIfPresent(Date.self, forKey: .dateCreated)
         self.isPremium = try container.decodeIfPresent(Bool.self, forKey: .isPremium)
         self.preferences = try container.decodeIfPresent([String].self, forKey: .preferences)
+        self.displayName = try container.decodeIfPresent(String.self, forKey: .displayName) // NEW
     }
     
     func encode(to encoder: any Encoder) throws {
@@ -84,6 +80,7 @@ struct DBUser: Codable {
         try container.encodeIfPresent(self.dateCreated, forKey: .dateCreated)
         try container.encodeIfPresent(self.isPremium, forKey: .isPremium)
         try container.encodeIfPresent(self.preferences, forKey: .preferences)
+        try container.encodeIfPresent(self.displayName, forKey: .displayName) // NEW
     }
     
 }
@@ -96,69 +93,16 @@ final class UserManager {
     private let userCollection = Firestore.firestore().collection("users")
     
     private func userDocument(userId: String) -> DocumentReference {
-        
         userCollection.document(userId)
-        
     }
-    
-//    private let encoder: Firestore.Encoder = {
-//        let encoder = Firestore.Encoder()
-//        encoder.keyEncodingStrategy = .convertToSnakeCase
-//        return encoder
-//    }()
-//    
-//    private let decoder: Firestore.Decoder = {
-//        let decoder = Firestore.Decoder()
-//        decoder.keyDecodingStrategy = .convertFromSnakeCase
-//        return decoder
-//    }()
     
     func createNewUser(user: DBUser) async throws {
         try userDocument(userId: user.userId).setData(from: user, merge: false)
     }
     
-    //    func createNewUser(auth: AuthDataResultModel) async throws {
-    //        var userData: [String: Any] = [
-    //            "user_id" : auth.uid,
-    //            "date_created" : Timestamp(),
-    //
-    //        ]
-    //
-    //        if let email = auth.email {
-    //            userData["email"] = email
-    //        }
-    //
-    //        if let photoUrl = auth.photoUrl {
-    //            userData["photo_url"] = photoUrl
-    //        }
-    //
-    //
-    //        try await userDocument(userId: auth.uid).setData(userData, merge: false)
-    //
-    //    }
-    
     func getUser(userId: String) async throws -> DBUser {
         try await userDocument(userId: userId).getDocument(as: DBUser.self)
     }
-    
-    //    func getUser(userId: String) async throws -> DBUser {
-    //        let snapshot = try await userDocument(userId: userId).getDocument()
-    //
-    //        guard let data = snapshot.data(), let userId = data["user_id"] as? String else {
-    //            throw URLError(.badServerResponse)
-    //        }
-    //
-    //        let email = data["email"] as? String
-    //        let photoUrl = data["photo_url"] as? String
-    //        let dateCreated = data["date_created"] as? Date
-    //
-    //        return DBUser(userId: userId, email: email, photoUrl: photoUrl, dateCreated: dateCreated)
-    //
-    //    }
-    
-//    func updateUserPremiumStatus(user: DBUser) async throws {
-//        try userDocument(userId: user.userId).setData(from: user, merge: true, encoder: encoder)
-//    }
     
     func updateUserPremiumStatus(userId: String, isPremium: Bool) async throws {
         let data: [String:Any] = [
@@ -180,4 +124,13 @@ final class UserManager {
         ]
         try await userDocument(userId: userId).updateData(data)
     }
+    
+    // NEW: update display name
+    func updateUserDisplayName(userId: String, displayName: String) async throws {
+        let data: [String: Any] = [
+            DBUser.CodingKeys.displayName.rawValue: displayName
+        ]
+        try await userDocument(userId: userId).updateData(data)
+    }
 }
+

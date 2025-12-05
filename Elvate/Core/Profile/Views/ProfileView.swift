@@ -94,6 +94,12 @@ struct ProfileView: View {
     @State private var deleteErrorMessage: String? = nil
     @State private var deletingIds: Set<String> = []
     
+    // Edit display name
+    @State private var isEditingName: Bool = false
+    @State private var displayNameDraft: String = ""
+    @State private var isSavingName: Bool = false
+    @State private var nameError: String? = nil
+    
     let preferenceOptions: [String] = ["Sports", "Movies", "Books"]
     
     private func preferenceIsSelected( text: String) -> Bool {
@@ -103,6 +109,9 @@ struct ProfileView: View {
     // MARK: - Header helpers
     
     private var userInitials: String {
+        if let dn = viewModel.user?.displayName, let first = dn.first {
+            return String(first).uppercased()
+        }
         if let email = viewModel.user?.email, let first = email.first {
             return String(first).uppercased()
         }
@@ -115,6 +124,10 @@ struct ProfileView: View {
     
     private var userEmail: String {
         viewModel.user?.email ?? "Unknown"
+    }
+    
+    private var displayName: String {
+        viewModel.user?.displayName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? "User"
     }
     
     private var avatarURL: URL? {
@@ -149,6 +162,42 @@ struct ProfileView: View {
         } message: {
             Text(deleteErrorMessage ?? "")
         }
+        // Edit display name sheet
+        .sheet(isPresented: $isEditingName) {
+            NavigationStack {
+                Form {
+                    Section(header: Text("Display name")) {
+                        TextField("Your name", text: $displayNameDraft)
+                            .textInputAutocapitalization(.words)
+                            .autocorrectionDisabled(false)
+                    }
+                    if let nameError {
+                        Section {
+                            Text(nameError)
+                                .foregroundStyle(.red)
+                        }
+                    }
+                }
+                .navigationTitle("Edit name")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            isEditingName = false
+                            nameError = nil
+                        }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button {
+                            Task { await saveDisplayName() }
+                        } label: {
+                            if isSavingName { ProgressView() } else { Text("Save") }
+                        }
+                        .disabled(isSavingName)
+                    }
+                }
+            }
+            .presentationDetents([.height(220), .medium])
+        }
     }
     
     // MARK: - Sections
@@ -165,8 +214,23 @@ struct ProfileView: View {
                 
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 8) {
-                        Text("User")
+                        Text(displayName)
                             .font(.headline)
+                        Button {
+                            displayNameDraft = displayName
+                            nameError = nil
+                            isEditingName = true
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
+                                .font(.caption2.weight(.semibold))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(Color.blue.opacity(0.12))
+                                .foregroundColor(.blue)
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        
                         if isPremium {
                             Label("Premium", systemImage: "star.fill")
                                 .font(.caption2.weight(.semibold))
@@ -342,7 +406,6 @@ struct ProfileView: View {
                     
                     Chart {
                         ForEach(viewModel.weightHistory, id: \.id) { e in
-                            // Ostry wykres: bez interpolacji i bez AreaMark
                             LineMark(
                                 x: .value("Date", e.dateCreated),
                                 y: .value("Weight (kg)", e.value)
@@ -369,7 +432,6 @@ struct ProfileView: View {
             }
         }
         .padding(16)
-        // Tło tylko dla karty (nie rozciąga się poza jej treść)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -431,7 +493,6 @@ struct ProfileView: View {
     }
     
     private func workoutRow(_ w: DBCompletedWorkout) -> some View {
-        // Priorytet: aktualna ikona z RoutineStore po routineId
         let liveIconName: String? = {
             if let rid = w.routineId, let r = routineStore.routines.first(where: { $0.dbId == rid }) {
                 return r.iconName
@@ -562,6 +623,38 @@ struct ProfileView: View {
             }
         }
     }
+    
+    // MARK: - Save display name
+    
+    private func saveDisplayName() async {
+        nameError = nil
+        let trimmed = displayNameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Walidacja: 2–24 znaki, bez pustej nazwy
+        guard trimmed.count >= 2, trimmed.count <= 24 else {
+            nameError = "Name must be 2–24 characters."
+            return
+        }
+        
+        guard let auth = try? AuthenticationManager.shared.getAuthenticatedUser() else {
+            nameError = "User no logged in."
+            return
+        }
+        isSavingName = true
+        defer { isSavingName = false }
+        
+        do {
+            try await UserManager.shared.updateUserDisplayName(userId: auth.uid, displayName: trimmed)
+            try? await viewModel.loadCurrentUser()
+            isEditingName = false
+        } catch {
+            nameError = "Cannot save name: \(error.localizedDescription)"
+        }
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
 }
 
 struct ProfileView_Previews: PreviewProvider {
