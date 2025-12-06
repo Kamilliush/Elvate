@@ -142,8 +142,9 @@ struct ProfileView: View {
             VStack(spacing: 20) {
                 profileHeader
                 weightCard
-                finishedWorkoutsCard
                 measurementsShortcutCard
+                finishedWorkoutsCard
+                
             }
             .padding(20)
         }
@@ -542,7 +543,7 @@ struct ProfileView: View {
                 NavigationLink {
                     MeasurementDetailView(metric: .biceps)
                 } label: {
-                    quickActionButton(title: "Add biceps size", icon: "ruler", tint: .blue)
+                    quickActionButton(title: "Log biceps", icon: "ruler", tint: .blue)
                 }
                 
                 NavigationLink {

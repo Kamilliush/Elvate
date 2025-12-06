@@ -41,72 +41,29 @@ struct EditRoutineView: View {
     
     var body: some View {
         NavigationStack {
-            Form {
-                Section(header: Text("Routine name")) {
-                    TextField("e.g. Push Day", text: $name)
-                }
-                
-                Section(header: Text("Routine icon")) {
-                    IconGridInline(icons: availableIcons, selected: $iconName)
-                }
-                
-                Section(header: Text("Exercise parameters")) {
-                    ForEach($items) { $item in
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(item.exercise.name)
-                                .font(.headline)
-                            
-                            Stepper("Number of sets: \(item.plan.count)", value: Binding(
-                                get: { item.plan.count },
-                                set: { newCount in
-                                    adjustPlanCount(for: &item.plan, to: newCount)
-                                }
-                            ), in: 1...10)
-                            
-                            ForEach($item.plan) { $setPlan in
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text("Set \(seriesIndex(in: item.plan, id: setPlan.id) + 1)")
-                                        .font(.subheadline.bold())
-                                    
-                                    HStack {
-                                        Stepper("Reps: \(setPlan.reps)", value: $setPlan.reps, in: 1...50)
-                                    }
-                                    HStack {
-                                        Stepper("Weight: \(formattedWeight(setPlan.weight)) kg",
-                                                value: $setPlan.weight,
-                                                in: 0...500,
-                                                step: 2.5)
-                                    }
-                                }
-                                .padding(.vertical, 4)
-                            }
-                            
-                            Stepper("Rest: \(item.restSeconds) s", value: $item.restSeconds, in: 15...600, step: 15)
-                        }
-                        .padding(.vertical, 6)
+            ScrollView {
+                VStack(spacing: 20) {
+                    nameCard
+                    iconCard
+                    parametersCard
+                    
+                    if let errorMessage {
+                        errorCard(errorMessage)
                     }
+                    if let deleteErrorMessage {
+                        errorCard(deleteErrorMessage)
+                    }
+                    
+                    actionButtons
                 }
-                
-                if let errorMessage {
-                    Section { Text(errorMessage).foregroundStyle(.red) }
-                }
+                .padding(20)
             }
             .navigationTitle("Edit routine")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
-                
-                ToolbarItem(placement: .confirmationAction) {
-                    Button {
-                        Task { await saveChanges() }
-                    } label: {
-                        if isSaving { ProgressView() } else { Text("Save") }
-                    }
-                    .disabled(isSaving || items.isEmpty)
-                }
-                
-                // Delete
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(role: .destructive) {
                         showDeleteConfirm = true
@@ -116,12 +73,9 @@ struct EditRoutineView: View {
                     .disabled(isDeleting || routine.dbId == nil)
                 }
             }
-            
             .alert("Delete routine “\(routine.name)”?",
                    isPresented: $showDeleteConfirm) {
-                
                 Button("Cancel", role: .cancel) {}
-                
                 Button("Delete", role: .destructive) {
                     Task { await deleteRoutine() }
                 }
@@ -130,6 +84,195 @@ struct EditRoutineView: View {
             }
         }
     }
+    
+    // MARK: - Cards
+    
+    private var nameCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("Routine name", systemImage: "text.cursor")
+                    .font(.headline)
+                Spacer()
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Name")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                TextField("e.g. Push Day", text: $name)
+                    .textFieldStyle(.roundedBorder)
+            }
+        }
+        .padding(16)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.06))
+        )
+        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+    }
+    
+    private var iconCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("Routine icon", systemImage: "app.dashed")
+                    .font(.headline)
+                Spacer()
+            }
+            IconGridInline(icons: availableIcons, selected: $iconName)
+        }
+        .padding(16)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.06))
+        )
+        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+    }
+    
+    private var parametersCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("Exercise parameters", systemImage: "slider.horizontal.3")
+                    .font(.headline)
+                Spacer()
+            }
+            VStack(spacing: 12) {
+                ForEach($items) { $item in
+                    exerciseParametersCard(item: $item)
+                }
+            }
+        }
+        .padding(16)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.06))
+        )
+        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+    }
+    
+    private func exerciseParametersCard(item: Binding<ExerciseInRoutine>) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header
+            HStack(spacing: 10) {
+                Text(item.wrappedValue.exercise.name)
+                    .font(.headline)
+                Spacer()
+            }
+            
+            // Sets count
+            HStack(spacing: 12) {
+                Image(systemName: "square.stack.3d.up")
+                    .foregroundStyle(.secondary)
+                Stepper("Number of sets: \(item.wrappedValue.plan.count)", value: Binding(
+                    get: { item.wrappedValue.plan.count },
+                    set: { newCount in
+                        adjustPlanCount(for: &item.wrappedValue.plan, to: newCount)
+                    }
+                ), in: 1...10)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            
+            // Per-set parameters
+            VStack(spacing: 10) {
+                ForEach(item.plan) { $setPlan in
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Set \(seriesIndex(in: item.wrappedValue.plan, id: setPlan.id) + 1)")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        
+                        HStack(spacing: 12) {
+                            Image(systemName: "repeat")
+                                .foregroundStyle(.secondary)
+                            Stepper("Reps: \(setPlan.reps)", value: $setPlan.reps, in: 1...50)
+                        }
+                        HStack(spacing: 12) {
+                            Image(systemName: "scalemass")
+                                .foregroundStyle(.secondary)
+                            Stepper("Weight: \(formattedWeight(setPlan.weight)) kg",
+                                    value: $setPlan.weight,
+                                    in: 0...500,
+                                    step: 2.5)
+                        }
+                    }
+                    .padding(12)
+                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(Color.primary.opacity(0.06))
+                    )
+                }
+            }
+            
+            // Rest timer
+            HStack(spacing: 12) {
+                Image(systemName: "timer")
+                    .foregroundStyle(.secondary)
+                Stepper("Rest: \(item.wrappedValue.restSeconds) s", value: item.restSeconds, in: 15...600, step: 15)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .padding(12)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .shadow(color: .black.opacity(0.05), radius: 6, y: 3)
+    }
+    
+    private func errorCard(_ message: String) -> some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                Text(message)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(12)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+    
+    private var actionButtons: some View {
+        HStack(spacing: 12) {
+            Button(role: .destructive) {
+                showDeleteConfirm = true
+            } label: {
+                HStack {
+                    if isDeleting { ProgressView().tint(.white) }
+                    Text(isDeleting ? "Deleting…" : "Delete")
+                        .font(.headline)
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.red)
+                .foregroundColor(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            }
+            .disabled(isDeleting)
+            
+            Button {
+                Task { await saveChanges() }
+            } label: {
+                HStack {
+                    if isSaving { ProgressView().tint(.white) }
+                    Text(isSaving ? "Saving…" : "Save")
+                        .font(.headline)
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(items.isEmpty ? Color.gray.opacity(0.4) : Color.accentColor)
+                .foregroundColor(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
+            }
+            .disabled(isSaving || items.isEmpty)
+        }
+    }
+    
+    // MARK: - Actions
     
     private func saveChanges() async {
         errorMessage = nil
@@ -263,4 +406,3 @@ private struct IconGridInline: View {
         .padding(.vertical, 6)
     }
 }
-

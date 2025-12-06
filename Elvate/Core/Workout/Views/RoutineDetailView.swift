@@ -33,135 +33,46 @@ struct RoutineDetailView: View {
     }
     
     var body: some View {
-        List {
-            headerSection
-            
-            ForEach($states) { $state in
-                Section(header: Text(state.item.exercise.name)) {
-                    if !isRunning {
-                        // PODGLĄD
-                        ForEach(Array(state.item.plan.enumerated()), id: \.offset) { offset, p in
-                            HStack {
-                                Text("Set \(offset + 1)")
-                                Spacer()
-                                Text("\(p.reps) reps • \(formattedWeight(p.weight)) kg")
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        HStack {
-                            Image(systemName: "timer")
-                                .foregroundStyle(.secondary)
-                            Text("Rest timer: \(state.item.restSeconds) s")
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                        }
-                    } else {
-                        // TRYB TRENINGU
-                        if state.isCompleted {
-                            HStack {
-                                Spacer()
-                                Label("Completed", systemImage: "checkmark.seal.fill")
-                                    .foregroundStyle(.green)
-                                Spacer()
-                            }
-                        }
-                        
-                        ForEach($state.setsProgress) { $set in
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Text("Set \(set.index + 1)")
-                                        .font(.headline)
-                                    Spacer()
-                                    Toggle("Done", isOn: $set.done)
-                                        .labelsHidden()
-                                        .onChange(of: set.done) { newValue in
-                                            handleToggleDone(for: state.id, setIndex: set.index, newValue: newValue)
-                                        }
-                                }
-                                
-                                HStack {
-                                    Stepper("Reps: \(set.repsDone)",
-                                            value: $set.repsDone,
-                                            in: 0...max(100, state.item.plan[set.index].reps))
-                                }
-                                
-                                HStack {
-                                    Stepper("Weight: \(formattedWeight(set.weight)) kg",
-                                            value: $set.weight,
-                                            in: 0...500,
-                                            step: 2.5)
-                                    .disabled(state.isResting)
-                                }
-                            }
-                            .padding(.vertical, 4)
-                        }
-                        
-                        if state.isResting {
-                            HStack {
-                                ProgressView(value: Double(state.restRemaining), total: Double(state.item.restSeconds))
-                                    .progressViewStyle(.linear)
-                                Text("\(state.restRemaining)s")
-                                    .monospacedDigit()
-                                    .frame(width: 60, alignment: .trailing)
-                            }
-                            .animation(.default, value: state.restRemaining)
-                            
-                            Button { stopRest(for: state.id) } label: {
-                                Text("Skip rest")
-                            }
-                        }
-                        
-                        HStack {
-                            Button {
-                                markNextSetDone(for: state.id)
-                            } label: {
-                                Text(state.nextSetIndexToComplete != nil ? "Next set completed" : "All sets completed")
-                            }
-                            .disabled(state.nextSetIndexToComplete == nil || state.isResting)
-                            
-                            Spacer()
-                            
-                            if !state.isCompleted {
-                                Button("Exercise completed") {
-                                    finishExercise(for: state.id)
-                                }
-                                .disabled(!state.allSetsDone)
-                            }
-                        }
+        ScrollView {
+            VStack(spacing: 20) {
+                headerCard
+                
+                if let errorMessage {
+                    errorCard(errorMessage)
+                }
+                
+                // Ćwiczenia
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(isRunning ? "Training" : "Preview")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 4)
+                    
+                    ForEach($states) { $state in
+                        exerciseCard($state)
                     }
                 }
             }
-            
-            if let errorMessage {
-                Section {
-                    Text(errorMessage)
-                        .foregroundStyle(.red)
-                }
-            }
+            .padding(20)
         }
-        .id(isRunning)
         .navigationTitle(currentRoutine.name)
+        .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             if states.isEmpty {
                 states = currentRoutine.items.map { RuntimeExerciseState(item: $0) }
             }
-            // sprawdź, czy jest trening w toku dla tej rutyny
             if let _ = WorkoutInProgressStore.shared.load(routineName: currentRoutine.name) {
-                // podpowiedz wznowienie
                 askResume = true
             }
         }
         .onDisappear {
             stopWorkoutTimer()
         }
-        // Reaguj na zmiany w RoutineStore i aktualizuj currentRoutine + states (jeśli nie trwa trening)
         .onReceive(routineStore.$routines) { _ in
             syncWithStoreIfUpdated()
         }
         .alert("Resume unfinished routine?", isPresented: $askResume) {
-            Button("Nie", role: .cancel) {
-                // nic – zostaw podgląd
-            }
+            Button("Nie", role: .cancel) {}
             Button("Resume") {
                 resumeIfAvailable()
             }
@@ -171,7 +82,6 @@ struct RoutineDetailView: View {
         .sheet(isPresented: $showSummary) {
             if let summary {
                 WorkoutSummaryView(summary: summary) {
-                    // zamknij sheet i wróć do listy
                     showSummary = false
                     dismiss()
                 }
@@ -191,7 +101,6 @@ struct RoutineDetailView: View {
         .sheet(isPresented: $showEdit) {
             EditRoutineView(routine: currentRoutine) { updated in
                 routineStore.update(updated)
-                // Po zapisie zaktualizuj lokalny stan natychmiast
                 syncAfterEdit(updated: updated)
             }
         }
@@ -199,40 +108,70 @@ struct RoutineDetailView: View {
     
     // MARK: - Header
     
-    private var headerSection: some View {
-        Section(header: Text("Routine")) {
-            let tint = iconTint(for: currentRoutine.iconName)
+    private var headerCard: some View {
+        let tint = iconTint(for: currentRoutine.iconName)
+        return VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(tint.opacity(0.12))
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(tint.opacity(0.14))
                     Image(systemName: currentRoutine.iconName)
                         .foregroundStyle(tint)
                 }
-                .frame(width: 36, height: 36)
+                .frame(width: 48, height: 48)
                 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(currentRoutine.name)
-                        .font(.headline)
-                    Text("Exercises: \(currentRoutine.items.count)")
-                        .foregroundStyle(.secondary)
-                        .font(.subheadline)
+                        .font(.title3.weight(.semibold))
+                    HStack(spacing: 8) {
+                        Text("\(currentRoutine.items.count) exercises")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        if isRunning {
+                            Text("In progress")
+                                .font(.caption2.weight(.semibold))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.orange.opacity(0.15))
+                                .foregroundColor(.orange)
+                                .clipShape(Capsule())
+                        }
+                    }
                 }
                 Spacer()
             }
             
             if isRunning {
                 HStack {
-                    Label(workoutTimeString, systemImage: "clock")
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        Image(systemName: "clock")
+                            .foregroundStyle(.secondary)
+                        Text(workoutTimeString)
+                            .monospacedDigit()
+                            .font(.headline)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(.thinMaterial, in: Capsule())
+                    
                     Spacer()
-                    Button(role: .destructive) {
+                    
+                    Button {
                         Task { await endAndSaveWorkout() }
                     } label: {
-                        Text("End training")
-                            .foregroundStyle(.red)
+                        HStack(spacing: 8) {
+                            Image(systemName: "stop.fill")
+                            Text("End training")
+                                .font(.headline)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(Color.red)
+                        .foregroundColor(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
+                    .buttonStyle(.plain)
                 }
             } else {
                 HStack {
@@ -240,13 +179,186 @@ struct RoutineDetailView: View {
                     Button {
                         startWorkout()
                     } label: {
-                        Label("Start", systemImage: "play.fill")
-                            .font(.headline)
+                        HStack(spacing: 8) {
+                            Image(systemName: "play.fill")
+                            Text("Start")
+                                .font(.headline)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(Color.accentColor)
+                        .foregroundColor(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
                     }
                     Spacer()
                 }
             }
         }
+        .padding(16)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.06))
+        )
+        .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+    }
+    
+    private func exerciseCard(_ state: Binding<RuntimeExerciseState>) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center) {
+                Text(state.wrappedValue.item.exercise.name)
+                    .font(.headline)
+                Spacer()
+                if isRunning, state.wrappedValue.isCompleted {
+                    Text("Completed")
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.green.opacity(0.18))
+                        .foregroundColor(.green)
+                        .clipShape(Capsule())
+                }
+            }
+            
+            if !isRunning {
+                // PODGLĄD
+                VStack(spacing: 8) {
+                    ForEach(Array(state.wrappedValue.item.plan.enumerated()), id: \.offset) { offset, p in
+                        HStack {
+                            Text("Set \(offset + 1)")
+                            Spacer()
+                            Text("\(p.reps) reps • \(formattedWeight(p.weight)) kg")
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    HStack(spacing: 8) {
+                        Image(systemName: "timer")
+                            .foregroundStyle(.secondary)
+                        Text("Rest timer: \(state.wrappedValue.item.restSeconds) s")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                    }
+                    .font(.footnote)
+                    .padding(.horizontal, 4)
+                }
+            } else {
+                
+                VStack(spacing: 10) {
+                    ForEach(state.setsProgress) { $set in
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("Set \(set.index + 1)")
+                                    .font(.headline)
+                                Spacer()
+                                
+                               
+                                Button {
+                                    let newValue = !set.done
+                                    set.done = newValue
+                                    handleToggleDone(for: state.wrappedValue.id, setIndex: set.index, newValue: newValue)
+                                } label: {
+                                    Image(systemName: set.done ? "checkmark.circle.fill" : "circle")
+                                        .foregroundStyle(set.done ? .green : .secondary)
+                                        .font(.system(size: 22, weight: .semibold))
+                                        .transaction { $0.animation = nil }
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(set.done ? "Set done" : "Mark set done")
+                            }
+                            
+                            HStack(spacing: 12) {
+                                Image(systemName: "repeat")
+                                    .foregroundStyle(.secondary)
+                                Stepper("Reps: \(set.repsDone)",
+                                        value: $set.repsDone,
+                                        in: 0...max(100, state.wrappedValue.item.plan[set.index].reps))
+                            }
+                            
+                            HStack(spacing: 12) {
+                                Image(systemName: "scalemass")
+                                    .foregroundStyle(.secondary)
+                                Stepper("Weight: \(formattedWeight(set.weight)) kg",
+                                        value: $set.weight,
+                                        in: 0...500,
+                                        step: 2.5)
+                                .disabled(state.wrappedValue.isResting)
+                            }
+                        }
+                        .padding(12)
+                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    
+                    if state.wrappedValue.isResting {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                ProgressView(value: Double(state.wrappedValue.restRemaining), total: Double(state.wrappedValue.item.restSeconds))
+                                    .progressViewStyle(.linear)
+                                Text("\(state.wrappedValue.restRemaining)s")
+                                    .monospacedDigit()
+                                    .frame(width: 60, alignment: .trailing)
+                            }
+                            .animation(.default, value: state.wrappedValue.restRemaining)
+                            
+                            Button { stopRest(for: state.wrappedValue.id) } label: {
+                                Text("Skip rest")
+                                    .font(.subheadline.weight(.semibold))
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(.orange)
+                        }
+                        .padding(12)
+                        .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    
+                    HStack {
+                        Button {
+                            markNextSetDone(for: state.wrappedValue.id)
+                        } label: {
+                            Text(state.wrappedValue.nextSetIndexToComplete != nil ? "Next set completed" : "All sets completed")
+                                .font(.headline)
+                        }
+                        .disabled(state.wrappedValue.nextSetIndexToComplete == nil || state.wrappedValue.isResting)
+                        .buttonStyle(.borderedProminent)
+                        
+                        Spacer()
+                        
+                        if !state.wrappedValue.isCompleted {
+                            Button("Exercise completed") {
+                                finishExercise(for: state.wrappedValue.id)
+                            }
+                            .disabled(!state.wrappedValue.allSetsDone)
+                            .buttonStyle(.bordered)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.06))
+        )
+        .shadow(color: .black.opacity(0.05), radius: 6, y: 2)
+    }
+    
+    private func errorCard(_ message: String) -> some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                Text(message)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(12)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
     
     private var workoutTimeString: String {
@@ -258,7 +370,6 @@ struct RoutineDetailView: View {
     // MARK: - Sync helpers
     
     private func syncWithStoreIfUpdated() {
-        // Znajdź odpowiadającą rutynę w store po dbId (lub po nazwie fallback)
         let updated: Routine? = {
             if let dbId = routine.dbId {
                 return routineStore.routines.first(where: { $0.dbId == dbId })
@@ -267,7 +378,6 @@ struct RoutineDetailView: View {
             }
         }()
         guard let updated else { return }
-        // Jeśli coś się zmieniło – podmień currentRoutine i ewentualnie odśwież states (tylko gdy nie trwa trening)
         if updated != currentRoutine {
             currentRoutine = updated
             if !isRunning {
@@ -296,7 +406,6 @@ struct RoutineDetailView: View {
                 saveInProgressSnapshot()
             }
         }
-        // pierwszy snapshot od razu
         saveInProgressSnapshot()
     }
     
@@ -331,9 +440,9 @@ struct RoutineDetailView: View {
         }
         
         let completed = DBCompletedWorkout(
-            routineId: currentRoutine.dbId, // <- WAŻNE: zapisujemy powiązanie z rutyną
+            routineId: currentRoutine.dbId,
             routineName: currentRoutine.name,
-            routineIconName: currentRoutine.iconName, // zostawiamy dla kompatybilności/fallbacku
+            routineIconName: currentRoutine.iconName,
             dateCompleted: Date(),
             durationSeconds: workoutElapsedSeconds,
             exercises: completedExercises
@@ -342,9 +451,7 @@ struct RoutineDetailView: View {
         do {
             try await CompletedWorkoutsManager.shared.addCompletedWorkout(userId: auth.uid, workout: completed)
             saveSuccess = true
-            // usuń stan in-progress
             WorkoutInProgressStore.shared.clear(routineName: currentRoutine.name)
-            // policz podsumowanie i pokaż sheet
             let runtimeSnapshots = states.map { st in
                 RuntimeExerciseSnapshot(
                     exerciseId: st.item.exercise.id,
@@ -391,15 +498,12 @@ struct RoutineDetailView: View {
     
     private func resumeIfAvailable() {
         guard let saved = WorkoutInProgressStore.shared.load(routineName: currentRoutine.name) else { return }
-        // odtwórz stany
         if states.isEmpty {
             states = currentRoutine.items.map { RuntimeExerciseState(item: $0) }
         }
-        // mapuj z saved.exercises do states
         for i in states.indices {
             let exId = states[i].item.exercise.id
             if let snap = saved.exercises.first(where: { $0.exerciseId == exId }) {
-                // zaktualizuj sety
                 for j in states[i].setsProgress.indices {
                     let idx = states[i].setsProgress[j].index
                     if let s = snap.sets.first(where: { $0.index == idx }) {
@@ -412,7 +516,6 @@ struct RoutineDetailView: View {
         }
         workoutElapsedSeconds = saved.elapsedSeconds
         isRunning = true
-        // uruchom timer
         stopWorkoutTimer()
         workoutTimerTask = Task { @MainActor in
             while !Task.isCancelled {
